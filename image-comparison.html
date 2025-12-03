@@ -1,0 +1,621 @@
+<!-- 项目名称: image-comparison -->
+<!-- 项目创建日期: 2025年10月02日 15时29分16秒 -->
+<!-- 项目作者: lhc -->
+<!-- 项目版本: V1.0.0 -->
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片对比组件（支持左右拖入覆盖）</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        /* 对比容器 */
+        .comparison-container {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border-radius: 8px;
+            cursor: ew-resize;
+            border: 2px dashed #ddd;
+            min-height: 300px;
+            transition: all 0.3s ease;
+        }
+
+        /* 拖入反馈样式 */
+        .comparison-container.drag-over {
+            border-color: #4CAF50;
+        }
+        .comparison-container.drag-left {
+            background: linear-gradient(90deg, rgba(76, 175, 80, 0.15) 50%, transparent 50%);
+        }
+        .comparison-container.drag-right {
+            background: linear-gradient(90deg, transparent 50%, rgba(76, 175, 80, 0.15) 50%);
+        }
+
+        /* 左右拖入区域描述
+        .drop-zone-description {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 12px 16px;
+
+            z-index: 9;
+            pointer-events: none;
+            transition: opacity 0.3s ease, display 0.3s ease;
+            text-align: center;
+        }
+        .left-description {
+            left: 30px;
+        }
+        .right-description {
+            right: 30px;
+        } */
+/* 左右拖入区域描述（修改部分） */
+.drop-zone-description {
+    position: absolute;
+    /* 关键修改：使用flex布局和transform确保内容居中 */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 15px;
+    /* background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); */
+    z-index: 9;
+    pointer-events: none;
+    transition: opacity 0.3s ease, display 0.3s ease;
+    text-align: center;
+    width: 160px; /* 固定宽度确保居中效果一致 */
+}
+
+/* 左侧描述框：定位在左半区中心 */
+.left-description {
+    top: 50%;
+    left: 25%; /* 左半区的中心位置 */
+    transform: translate(-50%, -50%);
+}
+
+/* 右侧描述框：定位在右半区中心 */
+.right-description {
+    top: 50%;
+    left: 75%; /* 右半区的中心位置 */
+    transform: translate(-50%, -50%);
+}
+
+
+
+        .description-icon {
+            font-size: 22px;
+            color: #4CAF50;
+            margin-bottom: 6px;
+        }
+        .description-text {
+            font-size: 13px;
+            color: #333;
+            line-height: 1.4;
+        }
+        .drop-zone-description.hidden {
+            opacity: 0;
+            display: none;
+        }
+
+        /* 底部步骤提示 */
+        .drop-steps {
+            position: absolute;
+            bottom: 15px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            z-index: 9;
+            pointer-events: none;
+        }
+        .drop-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #666;
+            font-size: 11px;
+        }
+        .step-number {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background-color: #eee;
+            color: #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 4px;
+            transition: all 0.2s ease;
+        }
+        .step-number.active {
+            background-color: #4CAF50;
+            color: #fff;
+        }
+        .step-number.completed {
+            background-color: #4CAF50;
+            color: #fff;
+        }
+
+        /* 图片容器 */
+        .top-image-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 7;
+            clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+        }
+        .bottom-image-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 6;
+        }
+
+        /* 图片样式 */
+        .comparison-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            background-color: #f9f9f9;
+        }
+
+        /* 滑块样式 */
+        .comparison-slider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 4px;
+            background-color: #fff;
+            cursor: ew-resize;
+            z-index: 10;
+            transform: translateX(-50%);
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+        }
+        .comparison-handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            background-color: #4CAF50;
+            border-radius: 50%;
+            cursor: ew-resize;
+            z-index: 11;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s ease;
+        }
+        .comparison-handle:hover {
+            background-color: #3d8b40;
+        }
+        .comparison-handle::before {
+            content: "⟷";
+            color: #fff;
+            font-size: 18px;
+        }
+
+        /* 图片标签 */
+        .image-label {
+            position: absolute;
+            top: 20px;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 15px;
+            font-weight: 500;
+            color: #fff;
+            z-index: 8;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+        }
+        .label-top {
+            left: 20px;
+        }
+        .label-bottom {
+            right: 20px;
+        }
+
+        /* 错误提示 */
+        .error-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(244, 67, 54, 0.9);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 4px;
+            z-index: 12;
+            display: none;
+            font-size: 14px;
+        }
+        .error-message.visible {
+            display: block;
+            animation: fadeInOut 3s ease;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .title {
+                font-size: 20px;
+            }
+            .image-label {
+                font-size: 13px;
+                padding: 6px 12px;
+            }
+            .drop-zone-description {
+                padding: 10px 14px;
+            }
+            .description-text {
+                font-size: 12px;
+            }
+        }
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            .comparison-handle {
+                width: 32px;
+                height: 32px;
+            }
+            .drop-zone-description {
+                padding: 8px 12px;
+            }
+            .description-icon {
+                font-size: 18px;
+            }
+            .drop-steps {
+                bottom: 8px;
+            }
+        }
+
+            /* 默认隐藏图片 */
+            .comparison-image {
+                display: none;
+            }
+
+            /* 当图片有 src 时显示（通过添加类控制） */
+            .comparison-image.has-image {
+                display: block;
+            }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">图片对比工具</h1>
+        <p class="subtitle">拖到左侧更新左图，拖到右侧更新右图，拖动滑块查看对比（图片不变形）</p>
+        
+        <div class="comparison-container" id="comparisonContainer">
+            <!-- 错误提示 -->
+            <div class="error-message" id="errorMessage"></div>
+            
+            <!-- 左侧拖入描述 -->
+            <div class="drop-zone-description left-description" id="leftDescription">
+
+                <div class="description-icon">📁</div>
+                <div class="description-text">拖入左侧图片<br>（可覆盖更新）</div>
+            </div>
+            
+            <!-- 右侧拖入描述 -->
+            <div class="drop-zone-description right-description" id="rightDescription">
+                <div class="description-icon">📁</div>
+                <div class="description-text">拖入右侧图片<br>（可覆盖更新）</div>
+            </div>
+            
+            <!-- 底部步骤提示 -->
+            <div class="drop-steps">
+                <div class="drop-step">
+                    <div class="step-number active" id="step1">1</div>
+                    <div>左侧图</div>
+                </div>
+                <div class="drop-step">
+                    <div class="step-number" id="step2">2</div>
+                    <div>右侧图</div>
+                </div>
+            </div>
+
+            <!-- 顶部图片容器（左侧图） -->
+            <div class="top-image-container" id="topImageContainer">
+                <img src="" alt="左侧图片" class="comparison-image" id="topImage">
+                <div class="image-label label-top">左侧图</div>
+            </div>
+
+            <!-- 底部图片容器（右侧图） -->
+            <div class="bottom-image-container" id="bottomImageContainer">
+                <img src="" alt="右侧图片" class="comparison-image" id="bottomImage">
+                <div class="image-label label-bottom">右侧图</div>
+            </div>
+
+            <!-- 滑块 -->
+            <div class="comparison-slider" id="comparisonSlider">
+                <div class="comparison-handle"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const comparisonContainer = document.getElementById('comparisonContainer');
+        const topImageContainer = document.getElementById('topImageContainer');
+        const topImage = document.getElementById('topImage');
+        const bottomImage = document.getElementById('bottomImage');
+        const comparisonSlider = document.getElementById('comparisonSlider');
+        const errorMessage = document.getElementById('errorMessage');
+        const leftDescription = document.getElementById('leftDescription');
+        const rightDescription = document.getElementById('rightDescription');
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        
+        // 初始化变量
+        let isDraggingSlider = false;
+        let containerWidth = 0;
+        let leftImageLoaded = false;
+        let rightImageLoaded = false;
+
+        // 初始化容器尺寸
+        function initContainerSize() {
+            containerWidth = comparisonContainer.offsetWidth;
+            updateClipPath(50);
+        }
+
+        // 更新裁剪区域
+        function updateClipPath(percent) {
+            topImageContainer.style.clipPath = `polygon(0 0, ${percent}% 0, ${percent}% 100%, 0 100%)`;
+            comparisonSlider.style.left = `${percent}%`;
+        }
+
+        // 显示错误消息
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('visible');
+            setTimeout(() => {
+                errorMessage.classList.remove('visible');
+            }, 3000);
+        }
+
+        // 加载图片到指定区域（支持覆盖）
+        function loadImageToZone(file, zone) {
+            // 验证文件类型
+            if (!file.type.startsWith('image/')) {
+                showError('请拖入图片文件（支持JPG、PNG、GIF）');
+                return;
+            }
+            // 验证文件大小（限制10MB）
+            if (file.size > 10 * 1024 * 1024) {
+                showError('图片过大，请选择10MB以内的文件');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imgSrc = e.target.result;
+                const tempImg = new Image();
+
+                tempImg.onload = function() {
+                    // 首次加载图片时设置容器高度
+                    if (!leftImageLoaded && !rightImageLoaded) {
+                        const containerHeight = Math.min(
+                            window.innerHeight * 0.7,
+                            (containerWidth / tempImg.width) * tempImg.height
+                        );
+                        comparisonContainer.style.height = `${containerHeight}px`;
+                    }
+
+                    // 加载/覆盖图片
+                    if (zone === 'left') {
+                        // 显示被默认隐藏的图片
+                        // document.getElementById('topImageContainer').classList.add('has-image');
+                        topImage.classList.add('has-image');
+                        topImage.src = imgSrc;
+                        leftImageLoaded = true;
+                            // 显示左侧图片容器
+                        leftDescription.classList.add('hidden');
+                        step1.classList.remove('active');
+                        step1.classList.add('completed');
+                        step2.classList.add('active');
+                    } else {
+                        // 显示被默认隐藏的图片
+                        // document.getElementById('bottomImageContainer').classList.add('has-image');
+                        bottomImage.classList.add('has-image');
+                        bottomImage.src = imgSrc;
+                        rightImageLoaded = true;
+                            // 显示右侧图片容器
+                        rightDescription.classList.add('hidden');
+                        step2.classList.remove('active');
+                        step2.classList.add('completed');
+                        // 两张图都加载完成后移除边框
+                        if (leftImageLoaded) {
+                            comparisonContainer.style.border = 'none';
+                        }
+                    }
+                };
+                
+                tempImg.onerror = function() {
+                    showError('无法加载该图片，请尝试其他图片');
+                };
+
+                tempImg.src = imgSrc;
+            };
+            
+            reader.onerror = function() {
+                showError('读取文件失败，请重试');
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        // 拖入功能处理
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            comparisonContainer.addEventListener(eventName, preventDefaults, false);
+        });
+
+        // 拖入时高亮对应区域
+        function handleDragEnter(e) {
+            const containerRect = comparisonContainer.getBoundingClientRect();
+            const containerMiddle = containerRect.left + containerRect.width / 2;
+            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+
+            comparisonContainer.classList.add('drag-over');
+            if (clientX < containerMiddle) {
+                comparisonContainer.classList.add('drag-left');
+                comparisonContainer.classList.remove('drag-right');
+            } else {
+                comparisonContainer.classList.add('drag-right');
+                comparisonContainer.classList.remove('drag-left');
+            }
+        }
+
+        // 拖出时清除高亮
+        function handleDragLeave(e) {
+            const relatedTarget = e.relatedTarget;
+            if (!comparisonContainer.contains(relatedTarget)) {
+                comparisonContainer.classList.remove('drag-over', 'drag-left', 'drag-right');
+            }
+        }
+
+        // 处理拖放
+        function handleDrop(e) {
+            comparisonContainer.classList.remove('drag-over', 'drag-left', 'drag-right');
+            
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (!files || files.length === 0) return;
+
+            const containerRect = comparisonContainer.getBoundingClientRect();
+            const containerMiddle = containerRect.left + containerRect.width / 2;
+            const clientX = e.type === 'touchend' ? e.changedTouches[0].clientX : e.clientX;
+
+            // 根据拖放位置决定加载到左侧还是右侧
+            if (clientX < containerMiddle) {
+                loadImageToZone(files[0], 'left');
+            } else {
+                loadImageToZone(files[0], 'right');
+            }
+        }
+
+        // 滑块拖动功能
+        function startDragSlider(e) {
+            isDraggingSlider = true;
+            document.addEventListener('mousemove', dragSlider);
+            document.addEventListener('touchmove', dragSlider);
+            document.addEventListener('mouseup', endDragSlider);
+            document.addEventListener('touchend', endDragSlider);
+            e.preventDefault();
+        }
+
+        function dragSlider(e) {
+            if (!isDraggingSlider) return;
+
+            let clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+            const containerRect = comparisonContainer.getBoundingClientRect();
+            
+            // 计算滑块位置百分比
+            let positionPercent = ((clientX - containerRect.left) / containerRect.width) * 100;
+            positionPercent = Math.max(0, Math.min(positionPercent, 100));
+            
+            updateClipPath(positionPercent);
+        }
+
+        function endDragSlider() {
+            isDraggingSlider = false;
+            document.removeEventListener('mousemove', dragSlider);
+            document.removeEventListener('touchmove', dragSlider);
+        }
+
+        // 初始化事件监听
+        function init() {
+            initContainerSize();
+            
+            // 窗口大小变化时重新计算
+            window.addEventListener('resize', initContainerSize);
+            
+            // 滑块拖动事件
+            comparisonSlider.addEventListener('mousedown', startDragSlider);
+            comparisonSlider.addEventListener('touchstart', startDragSlider);
+            
+            // 点击容器调整滑块位置
+            comparisonContainer.addEventListener('click', (e) => {
+                if (!isDraggingSlider) {
+                    const containerRect = comparisonContainer.getBoundingClientRect();
+                    const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+                    let positionPercent = ((clientX - containerRect.left) / containerRect.width) * 100;
+                    positionPercent = Math.max(0, Math.min(positionPercent, 100));
+                    updateClipPath(positionPercent);
+                }
+            });
+
+            // 拖放事件
+            comparisonContainer.addEventListener('dragenter', handleDragEnter);
+            comparisonContainer.addEventListener('dragleave', handleDragLeave);
+            comparisonContainer.addEventListener('dragover', handleDragEnter);
+            comparisonContainer.addEventListener('drop', handleDrop);
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

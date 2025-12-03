@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAC地址转EUI-64工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #f0f2f5;
+            padding: 2rem 1rem;
+            color: #333;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+        }
+
+        h1 {
+            color: #165DFF;
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+            position: relative;
+            padding-bottom: 0.8rem;
+        }
+
+        h1::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 3px;
+            background: #165DFF;
+            border-radius: 3px;
+        }
+
+        .input-group {
+            margin-bottom: 1.8rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.6rem;
+            font-weight: 600;
+            color: #4E5969;
+            font-size: 0.95rem;
+        }
+
+        label .optional {
+            font-weight: normal;
+            color: #86909C;
+            font-size: 0.85rem;
+            margin-left: 0.5rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.9rem 1rem;
+            border: 1px solid #DCDFE6;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #165DFF;
+            box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.1);
+        }
+
+        .btn-container {
+            display: none; /* 隐藏按钮容器 */
+        }
+
+        .ipv6-input-group {
+            margin-bottom: 1.8rem;
+            /* 默认显示IPv6输入框 */
+        }
+
+        .result-container {
+            position: relative;
+            margin-top: 1rem;
+        }
+
+        .result {
+            padding: 2rem;
+            padding-right: 8rem;
+            border-radius: 6px;
+            min-height: 3rem;
+            display: flex;
+            align-items: center;
+            font-family: 'Consolas', monospace;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.3rem;
+            right: 0.3rem;
+            padding: 0.5rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            background: #bdbdbd;
+            color: #4E5969;
+
+        }
+
+        .copy-btn:hover {
+            background: #E5E6EB;
+        }
+
+        .copy-btn.copied {
+            background: #ECF7EF;
+            color: #00B42A;
+        }
+
+        .copy-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #F2F3F5;
+        }
+
+        .success {
+            background: #F0F7FF;
+            border: 1px solid #BEDAFF;
+            color: #1D5D9B;
+        }
+
+        .error {
+            background: #FFF2F3;
+            border: 1px solid #FFCCD1;
+            color: #C42C33;
+        }
+
+        .example {
+            margin-top: 2rem;
+            padding: 1.2rem;
+            background: #F7F8FA;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: #6B7785;
+            border-left: 3px solid #165DFF;
+        }
+
+        .example strong {
+            color: #4E5969;
+        }
+
+        .footer {
+            margin-top: 2rem;
+            color: #86909C;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 1.8rem 1.2rem;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .result {
+                padding-right: 6rem;
+            }
+
+            .copy-btn {
+                padding: 0.4rem 0.8rem;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>MAC地址转EUI-64工具</h1>
+
+        <div class="input-group">
+            <label for="macAddress">MAC地址（支持格式：xx:xx:xx:xx:xx:xx、xx-xx-xx-xx-xx-xx 或 xx xx xx xx xx xx）</label>
+            <input type="text" id="macAddress" placeholder="例如：64:db:8b:89:9b:ff、64-db-8b-89-9b-ff 或 64 db 8b 89 9b ff"
+                value="64:db:8b:89:9b:f0">
+        </div>
+
+        <div class="ipv6-input-group" id="ipv6InputGroup">
+            <label for="ipv6Address">参考IPv6地址（用于提取前缀，如2409:8a60:4ea0:fa70::）<span class="optional">（非必须）</span></label>
+            <input type="text" id="ipv6Address" placeholder="例如：2409:8a60:4ea0:fa70::" value="2401::">
+        </div>
+
+        <div class="result-container">
+            <div id="result" class="result"></div>
+            <button class="copy-btn" onclick="copyResult()" disabled>
+                <span>复制结果</span>
+            </button>
+        </div>
+
+        <div class="example">
+            <p><strong>转换说明：</strong>EUI-64转换通过在MAC地址中间插入0xFFFE，并翻转第一个字节的第7位（U/L位）实现。输入参考IPv6地址后，会自动拼接前缀与EUI-64后缀生成完整地址。</p>
+            <p><strong>示例：</strong><br>
+                MAC: 64:db:8b:89:9b:ff → EUI-64: 66db:8bff:fe89:9bff<br>
+                参考IPv6: 2409:8a60:4ea0:fa70:: → 完整地址: 2409:8a60:4ea0:fa70:66db:8bff:fe89:9bff
+            </p>
+        </div>
+    </div>
+
+    <div class="footer">
+        高效转换工具 · 基于IPv6标准实现
+    </div>
+
+    <script>
+        // 存储当前转换结果
+        let currentResult = '';
+        let currentEui64 = ''; // 单独存储EUI-64后缀
+
+        // IPv6地址压缩函数（实现RFC 5952标准）
+        function compressIPv6(ipv6Address) {
+            // 将地址分割成组
+            let groups = ipv6Address.split(':');
+            
+            // 移除前导零
+            groups = groups.map(group => {
+                // 保留空字符串（用于::），其他组去除前导零
+                return group === '' ? group : (parseInt(group, 16).toString(16) || '0');
+            });
+            
+            // 找到最长的连续零组序列
+            let maxLength = 0;
+            let startIndex = -1;
+            let currentLength = 0;
+            
+            for (let i = 0; i < groups.length; i++) {
+                if (groups[i] === '0' || groups[i] === '') {
+                    currentLength++;
+                    if (currentLength > maxLength) {
+                        maxLength = currentLength;
+                        startIndex = i - currentLength + 1;
+                    }
+                } else {
+                    currentLength = 0;
+                }
+            }
+            
+            // 如果找到可以压缩的零组序列
+            if (maxLength >= 2) {
+                // 替换为::
+                const firstPart = groups.slice(0, startIndex);
+                const secondPart = groups.slice(startIndex + maxLength);
+                
+                // 处理开头或结尾的情况
+                if (startIndex === 0) {
+                    firstPart.push('');
+                }
+                if (startIndex + maxLength === groups.length) {
+                    secondPart.unshift('');
+                }
+                
+                groups = firstPart.concat([''], secondPart);
+            }
+            
+            // 合并并处理连续的::
+            let result = groups.join(':').replace(/::+/, '::');
+            
+            // 处理特殊情况：:: 而不是 :::
+            if (result === ':::') {
+                result = '::';
+            }
+            
+            return result;
+        }
+
+        // 验证IPv6地址格式是否合法
+        function isValidIPv6(ipv6Address) {
+            if (!ipv6Address || ipv6Address.trim() === '') return false;
+            
+            // 严格的IPv6地址正则表达式
+            const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
+            
+            return ipv6Regex.test(ipv6Address);
+        }
+
+        // 验证并提取IPv6前缀（前64位）
+        function extractIpv6Prefix(ipv6Address) {
+            if (!ipv6Address.trim()) return null;
+
+            // 首先进行严格的格式验证
+            if (!isValidIPv6(ipv6Address)) {
+                throw new Error("无效的IPv6地址格式，请输入标准的IPv6地址");
+            }
+
+            // 处理压缩的::
+            let fullIpv6 = ipv6Address;
+            if (fullIpv6.includes('::')) {
+                const parts = fullIpv6.split('::');
+                const leftParts = parts[0] ? parts[0].split(':').filter(part => part !== '') : [];
+                const rightParts = parts[1] ? parts[1].split(':').filter(part => part !== '') : [];
+                const missingParts = 8 - (leftParts.length + rightParts.length);
+                
+                // 确保缺失部分数量合理
+                if (missingParts < 0) {
+                    throw new Error("IPv6地址过长，超过128位限制");
+                }
+                
+                fullIpv6 = [...leftParts, ...Array(missingParts).fill('0'), ...rightParts].join(':');
+            }
+
+            // 分割为组并校验长度
+            const groups = fullIpv6.split(':').filter(group => group !== '');
+            
+            // 校验IPv6地址总长度（展开后必须为8组）
+            if (groups.length !== 8) {
+                throw new Error(`IPv6地址格式不正确，展开后应为8组十六进制数（当前为${groups.length}组）`);
+            }
+            
+            // 验证每组的有效性（1-4个十六进制字符）
+            for (let i = 0; i < groups.length; i++) {
+                const group = groups[i];
+                if (group.length > 4 || !/^[0-9a-fA-F]+$/.test(group)) {
+                    throw new Error(`第${i+1}组地址"${group}"无效，每组应为1-4个十六进制字符`);
+                }
+            }
+
+            // 取前4组作为前缀（64位），并压缩
+            const prefix = groups.slice(0, 4).join(':');
+            return compressIPv6(prefix);
+        }
+
+        function macToEui64(macAddress) {
+            // 移除MAC地址中的分隔符（冒号、破折号或空格）
+            let mac = macAddress.replace(/[:-\s]/g, '');
+
+            // 验证MAC地址长度（12个十六进制字符）
+            if (mac.length !== 12) {
+                throw new Error("无效的MAC地址，长度应为12个字符（不含分隔符）");
+            }
+
+            // 验证是否为十六进制字符
+            if (!/^[0-9a-fA-F]+$/.test(mac)) {
+                throw new Error("无效的MAC地址，包含非十六进制字符");
+            }
+
+            // 将MAC地址转换为字节数组
+            let macBytes = [];
+            for (let i = 0; i < 12; i += 2) {
+                macBytes.push(parseInt(mac.substr(i, 2), 16));
+            }
+
+            // 插入0xFFFE到第3和第4字节之间
+            let eui64Bytes = [
+                ...macBytes.slice(0, 3),
+                0xFF, 0xFE,
+                ...macBytes.slice(3)
+            ];
+
+            // 修改U/L位（第1字节的第2位）
+            eui64Bytes[0] |= 0b00000010;
+
+            // 转换为十六进制字符串
+            let eui64Hex = eui64Bytes.map(byte => {
+                return byte.toString(16).padStart(2, '0');
+            }).join('');
+
+            // 每4个字符添加一个冒号分隔
+            let eui64Address = [];
+            for (let i = 0; i < eui64Hex.length; i += 4) {
+                eui64Address.push(eui64Hex.substr(i, 4));
+            }
+
+            return eui64Address.join(':');
+        }
+
+        function convertMacToEui64() {
+            const macInput = document.getElementById('macAddress');
+            const ipv6Input = document.getElementById('ipv6Address');
+            const resultDiv = document.getElementById('result');
+            const copyBtn = document.querySelector('.copy-btn');
+            const mac = macInput.value.trim();
+            const ipv6 = ipv6Input.value.trim();
+
+            try {
+                // 如果MAC地址为空，清空结果
+                if (!mac) {
+                    resultDiv.textContent = '';
+                    resultDiv.className = 'result';
+                    copyBtn.disabled = true;
+                    currentResult = '';
+                    currentEui64 = '';
+                    return;
+                }
+                
+                // 生成EUI-64后缀
+                currentEui64 = macToEui64(mac);
+
+                // 处理IPv6前缀拼接
+                if (ipv6) {
+                    const prefix = extractIpv6Prefix(ipv6);
+                    const fullAddress = `${prefix}:${currentEui64}`;
+                    currentResult = compressIPv6(fullAddress);
+                    resultDiv.textContent = `完整IPv6地址: ${currentResult}`;
+                } else {
+                    currentResult = compressIPv6(currentEui64);
+                    resultDiv.textContent = `转换结果: ${currentResult}`;
+                }
+
+                resultDiv.className = 'result success';
+                // 启用复制按钮
+                copyBtn.disabled = false;
+                copyBtn.classList.remove('copied');
+                copyBtn.innerHTML = '<span>复制结果</span>';
+            } catch (error) {
+                currentResult = '';
+                currentEui64 = '';
+                resultDiv.textContent = `错误: ${error.message}`;
+                resultDiv.className = 'result error';
+                // 禁用复制按钮
+                copyBtn.disabled = true;
+                copyBtn.classList.remove('copied');
+                copyBtn.innerHTML = '<span>复制结果</span>';
+            }
+        }
+
+        function copyResult() {
+            if (!currentResult) return;
+
+            // 复制到剪贴板
+            navigator.clipboard.writeText(currentResult).then(() => {
+                const copyBtn = document.querySelector('.copy-btn');
+                copyBtn.classList.add('copied');
+                copyBtn.innerHTML = '<span>已复制!</span>';
+
+                // 2秒后恢复按钮文本
+                setTimeout(() => {
+                    copyBtn.classList.remove('copied');
+                    copyBtn.innerHTML = '<span>复制结果</span>';
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制');
+            });
+        }
+
+        // 添加输入事件监听，实现自动转换
+        document.getElementById('macAddress').addEventListener('input', convertMacToEui64);
+        document.getElementById('ipv6Address').addEventListener('input', convertMacToEui64);
+
+        // 页面加载完成后自动转换一次示例
+        window.onload = function () {
+            convertMacToEui64();
+        };
+    </script>
+</body>
+
+</html>

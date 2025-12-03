@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPv6地址解析工具（含城市与MAC解析）</title>
+    <style>
+        /* 样式与之前保持一致，此处省略 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            color: #165DFF;
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 0.8rem;
+            border-bottom: 2px solid #165DFF;
+        }
+
+        .input-group {
+            margin-bottom: 1.8rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.6rem;
+            font-weight: 600;
+            color: #4E5969;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.9rem 1rem;
+            border: 1px solid #DCDFE6;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-family: 'Consolas', monospace;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #165DFF;
+            box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.1);
+        }
+
+        .btn-container {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        button {
+            padding: 0.9rem 2rem;
+            background: #165DFF;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #0E42D2;
+        }
+
+        .result-section {
+            margin-top: 2rem;
+        }
+
+        .result-card {
+            background: #F7F8FA;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #165DFF;
+        }
+
+        .result-card h3 {
+            color: #165DFF;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .detail-item {
+            margin: 0.8rem 0;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px dashed #E5E6EB;
+        }
+
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #4E5969;
+            display: inline-block;
+            width: 120px;
+        }
+
+        .detail-value {
+            font-family: 'Consolas', monospace;
+            color: #2C3E50;
+        }
+
+        .example {
+            margin-top: 2rem;
+            padding: 1.2rem;
+            background: #F0F7FF;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: #1D5D9B;
+        }
+
+        .error {
+            color: #E74C3C;
+            padding: 1rem;
+            background: #FFF2F3;
+            border-radius: 6px;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 1.5rem;
+            }
+
+            .detail-label {
+                display: block;
+                margin-bottom: 0.3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>IPv6地址解析工具</h1>
+
+        <div class="input-group">
+            <label for="ipv6Address">IPv6地址（支持带前缀长度，如240e:314:b713:6510:66db:8bff:fe89:9bff/64）</label>
+            <input type="text" id="ipv6Address" 
+                value="240e:314:b713:6510:66db:8bff:fe89:9bff/64"
+                placeholder="请输入IPv6地址（如240e:314:b713:6510:66db:8bff:fe89:9bff/64）">
+        </div>
+
+        <div class="btn-container">
+            <button onclick="parseIpv6()">解析IPv6地址</button>
+        </div>
+
+        <div id="result" class="result-section"></div>
+
+        <div class="example">
+            <p><strong>解析说明：</strong>支持解析运营商、城市区域、子网及EUI-64对应的原始MAC地址。</p>
+            <p><strong>数据说明：</strong>城市解析基于简化数据库，仅包含部分常见前缀，实际应用需依赖专业IP地理库。</p>
+        </div>
+    </div>
+
+    <script>
+        // 1. ISP信息数据库（扩展版）
+        const ispDatabase = {
+            '240e': '中国电信',
+            '2409': '中国联通',
+            '2408': '中国移动',
+            '2001:da8': '中国教育网(CERNET)',
+            '2001:250': '中国科技网(CSTNET)',
+            '2401': '中国广电'
+        };
+
+        // 2. 区域前缀-城市映射数据库（简化版，实际需对接专业库）
+        // 数据来源：公开IPv6分配信息整理（仅示例，不保证完全准确）
+        const regionCityDatabase = {
+            // 中国电信部分区域前缀（240e开头）
+            '240e:314': '广东省深圳市',
+            '240e:47f': '北京市',
+            '240e:581': '上海市',
+            '240e:682': '广东省广州市',
+            '240e:783': '浙江省杭州市',
+            // 中国联通部分区域前缀（2409开头）
+            '2409:8a60': '江苏省南京市',
+            '2409:8a70': '广东省深圳市',
+            // 中国移动部分区域前缀（2408开头）
+            '2408:8700': '四川省成都市',
+            '2408:8900': '湖北省武汉市'
+        };
+
+        // 解析IPv6地址
+        function parseIpv6() {
+            const input = document.getElementById('ipv6Address').value.trim();
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '';
+
+            try {
+                // 分离地址和前缀长度
+                const [ipv6Addr, prefixLength = '64'] = input.split('/');
+                
+                // 验证并处理IPv6地址（展开压缩格式）
+                const fullGroups = expandIpv6(ipv6Addr);
+                if (fullGroups.length !== 8) {
+                    throw new Error('无效的IPv6地址，必须包含8组十六进制数');
+                }
+
+                // 提取网络前缀（前64位，4组）和接口标识（后64位，4组）
+                const networkPrefix = fullGroups.slice(0, 4); // 如 ['240e', '314', 'b713', '6510']
+                const interfaceId = fullGroups.slice(4, 8);   // 如 ['66db', '8bff', 'fe89', '9bff']
+
+                // 解析ISP信息（基于第一组）
+                const firstGroup = networkPrefix[0];
+                const isp = ispDatabase[firstGroup.toLowerCase()] || '未知运营商';
+
+                // 解析区域和城市（基于前2组：运营商前缀+区域码）
+                const regionKey = `${networkPrefix[0]}:${networkPrefix[1]}`.toLowerCase(); // 如 '240e:314'
+                const city = regionCityDatabase[regionKey] || '未知城市（需更新区域数据库）';
+                const regionPrefix = networkPrefix.slice(1, 3).join(':'); // 如 '314:b713'
+
+                // 解析子网标识
+                const subnet = networkPrefix[3]; // 如 '6510'
+
+                // 分析EUI-64结构（接口标识）并反推原始MAC
+                const eui64Analysis = analyzeEui64(interfaceId.join(''));
+
+                // 构建结果HTML
+                resultDiv.innerHTML = `
+                    <div class="result-card">
+                        <h3>基本信息</h3>
+                        <div class="detail-item">
+                            <span class="detail-label">完整地址：</span>
+                            <span class="detail-value">${ipv6Addr}/${prefixLength}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">前缀长度：</span>
+                            <span class="detail-value">${prefixLength}位（网络前缀：${prefixLength}位，接口标识：${128 - parseInt(prefixLength)}位）</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">运营商：</span>
+                            <span class="detail-value">${isp}（前缀：${firstGroup}）</span>
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>网络前缀（前64位）</h3>
+                        <div class="detail-item">
+                            <span class="detail-label">完整前缀：</span>
+                            <span class="detail-value">${networkPrefix.join(':')}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">区域前缀：</span>
+                            <span class="detail-value">${regionPrefix}（对应城市：${city}）</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">子网标识：</span>
+                            <span class="detail-value">${subnet}</span>
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>接口标识（后64位）</h3>
+                        <div class="detail-item">
+                            <span class="detail-label">完整标识：</span>
+                            <span class="detail-value">${interfaceId.join(':')}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">类型：</span>
+                            <span class="detail-value">${eui64Analysis.isEui64 ? 'EUI-64（基于MAC生成）' : '随机生成标识'}</span>
+                        </div>
+                        ${eui64Analysis.isEui64 ? `
+                        <div class="detail-item">
+                            <span class="detail-label">原始MAC：</span>
+                            <span class="detail-value">${eui64Analysis.originalMac}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">EUI-64结构：</span>
+                            <span class="detail-value">前3字节 + FF:FE + 后3字节（符合EUI-64规范）</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">解析错误：${error.message}</div>`;
+            }
+        }
+
+        // 展开IPv6压缩格式（处理::）
+        function expandIpv6(ipv6) {
+            if (!/^[0-9a-fA-F:]+$/.test(ipv6)) {
+                throw new Error('IPv6地址包含无效字符，仅允许十六进制和冒号');
+            }
+
+            let parts = ipv6.split('::');
+            let left = parts[0] ? parts[0].split(':') : [];
+            let right = parts[1] ? parts[1].split(':') : [];
+
+            if (parts.length > 2) {
+                throw new Error('IPv6地址格式错误，::只能出现一次');
+            }
+
+            const zeroGroups = 8 - (left.length + right.length);
+            if (zeroGroups < 0) {
+                throw new Error('IPv6地址组过多，超过8组');
+            }
+
+            return [...left, ...Array(zeroGroups).fill('0'), ...right];
+        }
+
+        // 分析EUI-64结构并反推原始MAC
+        function analyzeEui64(interfaceHex) {
+    // 1. 基础验证（长度和格式）
+    if (!interfaceHex || interfaceHex.length !== 16) {
+        return { isEui64: false, reason: "Invalid length" };
+    }
+
+    // 2. 检查核心特征：是否包含 'fffe'（不限定严格位置）
+    const ffFeIndex = interfaceHex.toLowerCase().indexOf('fffe');
+    if (ffFeIndex === -1) {
+        return { isEui64: false, reason: "Missing 'fffe' marker" };
+    }
+
+    // 3. 提取MAC部分（兼容fffe位置偏移）
+    const macParts = [
+        interfaceHex.substring(0, ffFeIndex),                  // MAC前半部分
+        interfaceHex.substring(ffFeIndex + 4, interfaceHex.length) // MAC后半部分
+    ];
+
+    // 4. 合并为原始MAC（兼容非标准长度，如隐私扩展）
+    const originalMacHex = (macParts[0] + macParts[1]).toLowerCase();
+
+    // 5. 宽松校验MAC（仅检查非全零和非组播）
+    // 5.1 排除全零MAC
+    if (/^0+$/.test(originalMacHex)) {
+        return { isEui64: false, reason: "All-zero MAC" };
+    }
+
+    // 5.2 排除组播MAC（允许本地管理的MAC，即bit1=1）
+    const firstByte = parseInt(originalMacHex.substring(0, 2), 16);
+    if ((firstByte & 0x01) === 1) {
+        return { isEui64: false, reason: "Multicast MAC" };
+    }
+
+    // 6. 返回结果（不强制还原原始MAC，因隐私扩展可能随机化）
+    return {
+        isEui64: true,
+        originalMac: originalMacHex.match(/.{1,2}/g).join(':'), // 格式化为XX:XX:XX:XX
+        isLocal: (firstByte & 0x02) === 0x02 // 是否本地管理（bit1=1）
+    };
+}
+
+        // 页面加载时自动解析示例地址
+        window.onload = parseIpv6;
+    </script>
+</body>
+</html>

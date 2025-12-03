@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片分辨率调整与压缩工具</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        
+        .container {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        
+        h1 {
+            color: #2d3748;
+            margin-bottom: 2rem;
+            text-align: center;
+            font-weight: 600;
+            position: relative;
+            padding-bottom: 1rem;
+        }
+        
+        h1::after {
+            content: '';
+            display: block;
+            width: 80px;
+            height: 3px;
+            background: #2196F3;
+            margin: 0 auto;
+            border-radius: 3px;
+        }
+        
+        /* 提示弹窗样式 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .toast {
+            padding: 12px 24px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 300px;
+            max-width: 500px;
+            animation: slideDown 0.3s ease forwards;
+            border-left: 4px solid #ff9800;
+        }
+        
+        .toast.warning {
+            border-left-color: #ff9800;
+        }
+        
+        .toast.info {
+            border-left-color: #2196F3;
+        }
+        
+        .toast.error {
+            border-left-color: #f44336;
+        }
+        
+        .toast-icon {
+            font-size: 1.2rem;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .drop-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 4rem 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #fafafa;
+        }
+        
+        .drop-area:hover {
+            border-color: #2196F3;
+            background-color: #f5f9ff;
+        }
+        
+        .drop-area.active {
+            border-color: #2196F3;
+            background-color: #e3f2fd;
+        }
+        
+        .drop-area p {
+            color: #6c757d;
+            margin: 0.5rem 0;
+            font-size: 1.1rem;
+        }
+        
+        #file-input {
+            display: none;
+        }
+        
+        .preview-container {
+            display: flex;
+            gap: 2rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+        
+        .preview-box {
+            flex: 1;
+            min-width: 300px;
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+        
+        .preview-box h3 {
+            margin-bottom: 1rem;
+            color: #495057;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .preview-box h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: #2196F3;
+            border-radius: 2px;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            object-fit: contain;
+            background: white;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .controls {
+            margin: 2rem 0;
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 10px;
+        }
+        
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .control-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        input[type="number"], 
+        input[type="range"] {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        
+        input[type="number"]:focus, 
+        input[type="range"]:focus {
+            outline: none;
+            border-color: #2196F3;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+        }
+        
+        .size-controls {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .size-controls > div {
+            flex: 1;
+        }
+        
+        .ratio-buttons {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .ratio-btn {
+            padding: 0.75rem 1.25rem;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background-color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .ratio-btn:hover {
+            border-color: #2196F3;
+            color: #2196F3;
+        }
+        
+        .ratio-btn.active {
+            background-color: #2196F3;
+            color: white;
+            border-color: #2196F3;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+        }
+        
+        .lock-aspect {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+            color: #495057;
+        }
+        
+        .lock-aspect input {
+            margin-right: 0.75rem;
+            width: auto;
+            height: 18px;
+            width: 18px;
+            accent-color: #2196F3;
+        }
+        
+        .quality-value {
+            text-align: right;
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        
+        .btn {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-right: 1rem;
+            transition: all 0.3s;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15);
+        }
+        
+        .btn:hover {
+            background-color: #1976D2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
+        }
+        
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        #download-btn {
+            background-color: #4CAF50;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.15);
+        }
+        
+        #download-btn:hover {
+            background-color: #43A047;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+        }
+        
+        .file-info {
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+            background-color: white;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .processing {
+            color: #2196F3;
+            font-style: italic;
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .processing::after {
+            content: '';
+            width: 16px;
+            height: 16px;
+            border: 2px solid #2196F3;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .info-text {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <!-- 提示弹窗容器 -->
+    <div class="toast-container" id="toast-container"></div>
+    
+    <div class="container">
+        <h1>图片分辨率调整与压缩工具</h1>
+        
+        <div class="drop-area" id="drop-area">
+            <p>拖放图片到这里，或</p>
+            <button class="btn" onclick="document.getElementById('file-input').click()">选择图片</button>
+            <input type="file" id="file-input" accept="image/*">
+        </div>
+        
+        <div class="controls hidden" id="controls">
+            <div class="control-group">
+                <div class="control-group-header">
+                    <label>缩放比例</label>
+                    <span class="info-text">点击快速设置缩放比例</span>
+                </div>
+                <div class="ratio-buttons">
+                    <button class="ratio-btn" data-ratio="0.25">0.25x</button>
+                    <button class="ratio-btn" data-ratio="0.5">0.5x</button>
+                    <button class="ratio-btn" data-ratio="0.75">0.75x</button>
+                    <button class="ratio-btn" data-ratio="1">1x (原图)</button>
+                    <button class="ratio-btn" data-ratio="1.5">1.5x (放大)</button>
+                    <button class="ratio-btn" data-ratio="2">2x (放大)</button>
+                </div>
+                
+                <div class="control-group-header">
+                    <label>自定义尺寸 (px)</label>
+                    <span class="info-text">宽度和高度可单独设置</span>
+                </div>
+                <div class="size-controls">
+                    <div>
+                        <label for="target-width">宽度</label>
+                        <input type="number" id="target-width" min="10" placeholder="输入宽度">
+                    </div>
+                    <div>
+                        <label for="target-height">高度</label>
+                        <input type="number" id="target-height" min="10" placeholder="输入高度">
+                    </div>
+                </div>
+                
+                <div class="lock-aspect">
+                    <input type="checkbox" id="lock-aspect" checked>
+                    <label for="lock-aspect">保持宽高比（推荐）</label>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="quality">压缩质量 (0-100)</label>
+                <input type="range" id="quality" min="0" max="100" value="80">
+                <div class="quality-value">当前值: <span id="quality-value">80</span>%（值越高质量越好）</div>
+            </div>
+            
+            <div id="processing-indicator" class="processing hidden">正在处理图片</div>
+            
+            <button class="btn" id="download-btn" disabled>下载处理后的图片</button>
+        </div>
+        
+        <div class="preview-container hidden" id="preview-container">
+            <div class="preview-box">
+                <h3>原图</h3>
+                <img id="original-image" class="preview-image">
+                <div class="file-info" id="original-info"></div>
+            </div>
+            
+            <div class="preview-box">
+                <h3>处理后</h3>
+                <canvas id="processed-canvas" class="preview-image"></canvas>
+                <div class="file-info" id="processed-info"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('file-input');
+        const controls = document.getElementById('controls');
+        const previewContainer = document.getElementById('preview-container');
+        const originalImage = document.getElementById('original-image');
+        const processedCanvas = document.getElementById('processed-canvas');
+        const downloadBtn = document.getElementById('download-btn');
+        const targetWidthInput = document.getElementById('target-width');
+        const targetHeightInput = document.getElementById('target-height');
+        const qualitySlider = document.getElementById('quality');
+        const qualityValue = document.getElementById('quality-value');
+        const originalInfo = document.getElementById('original-info');
+        const processedInfo = document.getElementById('processed-info');
+        const lockAspectCheckbox = document.getElementById('lock-aspect');
+        const ratioButtons = document.querySelectorAll('.ratio-btn');
+        const processingIndicator = document.getElementById('processing-indicator');
+        const toastContainer = document.getElementById('toast-container');
+        
+        let originalFile = null;
+        let originalImageData = null;
+        let aspectRatio = 1;
+        let processTimeout = null;
+        let toastTimeout = null;
+        const AUTO_PROCESS_DELAY = 300; // 300ms自动处理延迟
+        const TOAST_DURATION = 3000; // 提示显示时间
+        
+        // 拖放事件处理
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            dropArea.classList.add('active');
+        }
+        
+        function unhighlight() {
+            dropArea.classList.remove('active');
+        }
+        
+        dropArea.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', handleFileSelect, false);
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                handleFiles(files);
+            }
+        }
+        
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length) {
+                handleFiles(files);
+            }
+        }
+        
+        // 显示提示弹窗
+        function showToast(message, type = 'warning') {
+            // 清除之前的提示
+            if (toastTimeout) {
+                clearTimeout(toastTimeout);
+                while (toastContainer.firstChild) {
+                    toastContainer.removeChild(toastContainer.firstChild);
+                }
+            }
+            
+            // 创建提示元素
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            // 设置图标
+            let icon = '⚠️';
+            if (type === 'info') icon = 'ℹ️';
+            if (type === 'error') icon = '❌';
+            
+            toast.innerHTML = `
+                <span class="toast-icon">${icon}</span>
+                <span>${message}</span>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            // 设置自动关闭
+            toastTimeout = setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-20px)';
+                toast.style.transition = 'opacity 0.3s, transform 0.3s';
+                
+                setTimeout(() => {
+                    toastContainer.removeChild(toast);
+                }, 300);
+            }, TOAST_DURATION);
+        }
+        
+        // 处理选择的文件
+        function handleFiles(files) {
+            const file = files[0];
+            if (!file.type.match('image.*')) {
+                showToast('请选择有效的图片文件！', 'error');
+                return;
+            }
+            
+            originalFile = file;
+            
+            // 显示原图
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                originalImage.src = e.target.result;
+                originalImage.onload = function() {
+                    originalImageData = {
+                        width: originalImage.naturalWidth,
+                        height: originalImage.naturalHeight,
+                        size: file.size
+                    };
+                    
+                    // 计算宽高比
+                    aspectRatio = originalImageData.width / originalImageData.height;
+                    
+                    // 设置默认缩放比例为0.5x
+                    const defaultRatio = 0.5;
+                    const defaultWidth = Math.round(originalImageData.width * defaultRatio);
+                    const defaultHeight = Math.round(originalImageData.height * defaultRatio);
+                    
+                    targetWidthInput.value = defaultWidth;
+                    targetHeightInput.value = defaultHeight;
+                    
+                    // 激活0.5x按钮
+                    activateRatioButton(defaultRatio);
+                    
+                    // 显示文件信息
+                    originalInfo.innerHTML = `
+                        尺寸: ${originalImageData.width} × ${originalImageData.height} px<br>
+                        大小: ${formatFileSize(originalImageData.size)}<br>
+                        格式: ${file.type}
+                    `;
+                    
+                    // 显示控制区和预览区
+                    controls.classList.remove('hidden');
+                    previewContainer.classList.remove('hidden');
+                    
+                    // 立即处理一次
+                    processImage();
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // 质量滑块事件
+        qualitySlider.addEventListener('input', function() {
+            qualityValue.textContent = this.value;
+            scheduleProcessImage();
+        });
+        
+        // 尺寸输入框事件
+        targetWidthInput.addEventListener('input', function() {
+            const width = parseInt(this.value) || 0;
+            
+            // 检查是否放大
+            if (originalImageData && width > originalImageData.width) {
+                showToast('警告：放大图片不会提高清晰度，可能会导致模糊', 'warning');
+            }
+            
+            if (lockAspectCheckbox.checked && originalImageData) {
+                targetHeightInput.value = Math.round(width / aspectRatio);
+            }
+            scheduleProcessImage();
+        });
+        
+        targetHeightInput.addEventListener('input', function() {
+            const height = parseInt(this.value) || 0;
+            
+            // 检查是否放大
+            if (originalImageData && height > originalImageData.height) {
+                showToast('警告：放大图片不会提高清晰度，可能会导致模糊', 'warning');
+            }
+            
+            if (lockAspectCheckbox.checked && originalImageData) {
+                targetWidthInput.value = Math.round(height * aspectRatio);
+            }
+            scheduleProcessImage();
+        });
+        
+        // 保持宽高比复选框事件
+        lockAspectCheckbox.addEventListener('change', function() {
+            if (!this.checked) {
+                showToast('提示：取消保持宽高比可能导致图片变形', 'info');
+            }
+            
+            if (this.checked && originalImageData) {
+                // 同步尺寸
+                const width = parseInt(targetWidthInput.value) || 0;
+                targetHeightInput.value = Math.round(width / aspectRatio);
+            }
+            scheduleProcessImage();
+        });
+        
+        // 比例按钮事件
+        ratioButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const ratio = parseFloat(this.dataset.ratio);
+                activateRatioButton(ratio);
+                
+                // 检查是否放大
+                if (ratio > 1) {
+                    showToast('提示：放大图片不会使图像更清晰，仅会增加像素尺寸', 'info');
+                }
+                
+                if (originalImageData) {
+                    const newWidth = Math.round(originalImageData.width * ratio);
+                    const newHeight = Math.round(originalImageData.height * ratio);
+                    
+                    targetWidthInput.value = newWidth;
+                    targetHeightInput.value = newHeight;
+                    
+                    scheduleProcessImage();
+                }
+            });
+        });
+        
+        // 激活比例按钮
+        function activateRatioButton(ratio) {
+            ratioButtons.forEach(btn => {
+                if (parseFloat(btn.dataset.ratio) === ratio) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+        
+        // 安排图片处理（防抖）
+        function scheduleProcessImage() {
+            if (processTimeout) {
+                clearTimeout(processTimeout);
+            }
+            
+            processingIndicator.classList.remove('hidden');
+            
+            processTimeout = setTimeout(() => {
+                processImage();
+            }, AUTO_PROCESS_DELAY);
+        }
+        
+        // 处理图片
+        function processImage() {
+            if (!originalImageData) return;
+            
+            const targetWidth = parseInt(targetWidthInput.value) || 100;
+            const targetHeight = parseInt(targetHeightInput.value) || 100;
+            const quality = parseInt(qualitySlider.value) / 100;
+            
+            // 设置canvas尺寸
+            processedCanvas.width = targetWidth;
+            processedCanvas.height = targetHeight;
+            
+            // 绘制图片
+            const ctx = processedCanvas.getContext('2d');
+            ctx.drawImage(originalImage, 0, 0, targetWidth, targetHeight);
+            
+            // 获取处理后图片的数据URL
+            const processedDataUrl = processedCanvas.toDataURL('image/jpeg', quality);
+            
+            // 计算处理后图片大小
+            const processedSize = Math.round(processedDataUrl.length * 0.75); // base64编码的大小计算
+            
+            // 更新信息
+            let ratioInfo = '';
+            const currentRatio = (targetWidth / originalImageData.width).toFixed(2);
+            if (parseFloat(currentRatio) > 1) {
+                ratioInfo = '<br><span style="color:#ff9800;">⚠️ 已放大图片，可能影响清晰度</span>';
+            } else if (!lockAspectCheckbox.checked) {
+                const actualAspectRatio = targetWidth / targetHeight;
+                const originalAspectRatio = originalImageData.width / originalImageData.height;
+                if (Math.abs(actualAspectRatio - originalAspectRatio) > 0.01) {
+                    ratioInfo = '<br><span style="color:#ff9800;">⚠️ 图片比例已改变，可能存在变形</span>';
+                }
+            }
+            
+            processedInfo.innerHTML = `
+                尺寸: ${targetWidth} × ${targetHeight} px<br>
+                大小: ${formatFileSize(processedSize)}<br>
+                压缩质量: ${Math.round(quality * 100)}%<br>
+                压缩率: ${Math.round((1 - processedSize / originalImageData.size) * 100)}%
+                ${ratioInfo}
+            `;
+            
+            // 启用下载按钮
+            downloadBtn.disabled = false;
+            downloadBtn.onclick = function() {
+                downloadImage(processedDataUrl, originalFile.name);
+            };
+            
+            processingIndicator.classList.add('hidden');
+        }
+        
+        // 下载图片
+        function downloadImage(dataUrl, originalName) {
+            const link = document.createElement('a');
+            const nameWithoutExt = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
+            link.download = `${nameWithoutExt}_compressed.jpg`;
+            link.href = dataUrl;
+            link.click();
+        }
+        
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>

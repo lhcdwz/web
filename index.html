@@ -4,20 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>全能工具箱 - 实用工具集合</title>
+  <!-- 引入Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入Font Awesome图标库 -->
   <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  
+  <!-- Tailwind配置 -->
   <script>
-    // Tailwind 配置
     tailwind.config = {
       theme: {
         extend: {
+          // 自定义颜色配置
           colors: {
-            primary: '#3B82F6',
-            secondary: '#10B981',
-            accent: '#8B5CF6',
-            dark: '#1E293B',
-            light: '#F8FAFC'
+            primary: '#3B82F6',     // 主色调：蓝色
+            secondary: '#10B981',   // 辅助色：绿色
+            accent: '#8B5CF6',      // 强调色：紫色
+            dark: '#1E293B',        // 深色模式背景
+            light: '#F8FAFC'        // 浅色模式背景
           },
+          // 自定义字体配置
           fontFamily: {
             inter: ['Inter', 'system-ui', 'sans-serif'],
           },
@@ -25,35 +30,106 @@
       }
     }
   </script>
+  
+  <!-- 自定义工具类和样式 -->
   <style type="text/tailwindcss">
     @layer utilities {
+      /* 内容自动可见性优化 */
       .content-auto {
         content-visibility: auto;
       }
+      
+      /* 工具卡片悬停效果 */
       .tool-card-hover {
         @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
       }
+      
+      /* 渐变背景 */
       .gradient-bg {
         @apply bg-gradient-to-br from-primary to-accent;
+      }
+      
+      /* 夜间模式样式 - 修复了不存在的bg-gray-850类 */
+      .dark-mode {
+        @apply bg-gray-900 text-gray-100 transition-colors duration-300;
+      }
+      
+      /* 夜间模式下白色背景元素转换为深灰色 */
+      .dark-mode .bg-white {
+        @apply bg-gray-800;
+      }
+      
+      /* 修复：将不存在的bg-gray-850替换为合法的bg-gray-800 */
+      .dark-mode .bg-gray-50 {
+        @apply bg-gray-800;
+      }
+      
+      /* 夜间模式下文本颜色调整 */
+      .dark-mode .text-gray-600 {
+        @apply text-gray-300;
+      }
+      
+      /* 夜间模式下边框颜色调整 */
+      .dark-mode .border-gray-300 {
+        @apply border-gray-600;
+      }
+      
+      /* 夜间模式下工具卡片背景色调整 */
+      .dark-mode .bg-blue-50 {
+        @apply bg-blue-900/30;
+      }
+      .dark-mode .bg-green-50 {
+        @apply bg-green-900/30;
+      }
+      .dark-mode .bg-purple-50 {
+        @apply bg-purple-900/30;
+      }
+      .dark-mode .bg-yellow-50 {
+        @apply bg-yellow-900/30;
+      }
+      .dark-mode .bg-red-50 {
+        @apply bg-red-900/30;
+      }
+      .dark-mode .bg-indigo-50 {
+        @apply bg-indigo-900/30;
+      }
+      .dark-mode .bg-teal-50 {
+        @apply bg-teal-900/30;
+      }
+      .dark-mode .bg-orange-50 {
+        @apply bg-orange-900/30;
+      }
+      .dark-mode .bg-pink-50 {
+        @apply bg-pink-900/30;
+      }
+      .dark-mode .bg-gray-50 {
+        @apply bg-gray-800;
+      }
+      .dark-mode .bg-lime-50 {
+        @apply bg-lime-900/30;
       }
     }
   </style>
 </head>
-<body class="font-inter bg-gray-50 text-gray-800 min-h-screen">
-  <!-- 导航栏 -->
+
+<!-- 页面主体 -->
+<body class="font-inter bg-gray-50 text-gray-800 min-h-screen transition-colors duration-300">
+  <!-- 导航栏 - 固定在顶部 -->
   <header class="sticky top-0 z-50 bg-white shadow-md transition-all duration-300" id="navbar">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <!-- 网站Logo和名称 -->
       <div class="flex items-center space-x-2">
         <i class="fa fa-wrench text-primary text-2xl"></i>
         <h1 class="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-accent text-transparent bg-clip-text">全能工具箱</h1>
       </div>
       
-      <!-- 桌面导航 -->
+      <!-- 桌面端导航菜单 -->
       <nav class="hidden md:flex items-center space-x-6">
         <a href="#" class="font-medium text-primary hover:text-accent transition-colors">首页</a>
         <a href="#tools" class="font-medium text-gray-600 hover:text-primary transition-colors">工具集</a>
         <a href="#about" class="font-medium text-gray-600 hover:text-primary transition-colors">关于</a>
-        <button class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg">
+        <!-- 桌面端主题切换按钮 - 添加了id用于JS控制 -->
+        <button id="themeToggle" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg">
           <i class="fa fa-moon-o mr-1"></i> 切换主题
         </button>
       </nav>
@@ -64,20 +140,21 @@
       </button>
     </div>
     
-    <!-- 移动端导航菜单 -->
+    <!-- 移动端导航菜单 - 默认隐藏 -->
     <div class="md:hidden hidden bg-white w-full border-t" id="mobileMenu">
       <div class="container mx-auto px-4 py-2 flex flex-col space-y-3">
         <a href="#" class="py-2 font-medium text-primary hover:text-accent transition-colors">首页</a>
         <a href="#tools" class="py-2 font-medium text-gray-600 hover:text-primary transition-colors">工具集</a>
         <a href="#about" class="py-2 font-medium text-gray-600 hover:text-primary transition-colors">关于</a>
-        <button class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg w-full">
+        <!-- 移动端主题切换按钮 - 添加了id用于JS控制 -->
+        <button id="mobileThemeToggle" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg w-full">
           <i class="fa fa-moon-o mr-1"></i> 切换主题
         </button>
       </div>
     </div>
   </header>
 
-  <!-- 英雄区域 -->
+  <!-- 英雄区域 - 带渐变背景 -->
   <section class="gradient-bg text-white py-16 md:py-24">
     <div class="container mx-auto px-4">
       <div class="max-w-3xl mx-auto text-center">
@@ -104,10 +181,12 @@
     <div class="container mx-auto px-4">
       <div class="max-w-2xl mx-auto">
         <div class="relative">
+          <!-- 搜索输入框 - 添加id用于JS控制搜索功能 -->
           <input 
             type="text" 
             placeholder="搜索工具..." 
             class="w-full pl-12 pr-4 py-3 rounded-lg border border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+            id="searchInput"
           >
           <i class="fa fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
         </div>
@@ -140,91 +219,179 @@
       </div>
 
       <!-- 工具卡片网格 -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <!-- MD5转换工具 -->
-        <div id="md5" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover">
-          <div class="h-40 bg-blue-50 flex items-center justify-center">
-            <i class="fa fa-key text-6xl text-primary"></i>
-          </div>
-          <div class="p-6">
-            <h3 class="text-xl font-bold mb-2">MD5转换工具</h3>
-            <p class="text-gray-600 mb-4">将文本转换为MD5哈希值，支持多种编码格式</p>
-            <a href="tools/md5.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
-              使用工具 <i class="fa fa-arrow-right ml-2"></i>
-            </a>
-          </div>
-        </div>
+<!-- 工具卡片网格 -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-        <!-- 屏幕检测工具 -->
-        <div class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover">
-          <div class="h-40 bg-green-50 flex items-center justify-center">
-            <i class="fa fa-desktop text-6xl text-secondary"></i>
-          </div>
-          <div class="p-6">
-            <h3 class="text-xl font-bold mb-2">屏幕检测工具</h3>
-            <p class="text-gray-600 mb-4">检测屏幕分辨率、尺寸和像素密度等信息</p>
-            <a href="tools/screen.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
-              使用工具 <i class="fa fa-arrow-right ml-2"></i>
-            </a>
-          </div>
-        </div>
+<!-- 视频帧提取工具 -->
+<div class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="视频帧提取工具 视频解析 帧导出 图片提取 截图">
+  <div class="h-40 bg-blue-50 flex items-center justify-center cursor-pointer hover:bg-blue-100 transition-colors" onclick="window.location.href='视频解析.html'">
+    <i class="fa fa-film text-6xl text-primary"></i>
+  </div>
+  <div class="p-6">
+    <h3 class="text-xl font-bold mb-2">视频帧提取工具（视频截图）</h3>
+    <p class="text-gray-600 mb-4">提取视频帧、导出为图片、精确选择视频画面，支持多种常见格式</p>
+    <a href="视频解析.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+      使用工具 <i class="fa fa-arrow-right ml-2"></i>
+    </a>
+  </div>
+</div>
 
-        <!-- 文件格式转换工具 -->
-        <div id="file" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover">
-          <div class="h-40 bg-purple-50 flex items-center justify-center">
-            <i class="fa fa-exchange text-6xl text-accent"></i>
-          </div>
-          <div class="p-6">
-            <h3 class="text-xl font-bold mb-2">文件格式转换</h3>
-            <p class="text-gray-600 mb-4">支持多种文件格式之间的转换，简单高效</p>
-            <a href="tools/file-converter.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
-              使用工具 <i class="fa fa-arrow-right ml-2"></i>
-            </a>
-          </div>
-        </div>
+  <!-- MD5转换工具 -->
+  <div id="md5" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="md5转换工具 哈希校验 编码 加密">
+    <!-- 图片区域添加点击事件 -->
+    <div class="h-40 bg-blue-50 flex items-center justify-center cursor-pointer hover:bg-blue-100 transition-colors" onclick="window.location.href='哈希校验.html'">
+      <i class="fa fa-key text-6xl text-primary"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">MD5转换工具</h3>
+      <p class="text-gray-600 mb-4 line-clamp-2">将文本转换为MD5哈希值，支持多种编码格式</p>
+      <a href="哈希校验.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
 
-        <!-- 文件HEX查看工具 -->
-        <div class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover">
-          <div class="h-40 bg-yellow-50 flex items-center justify-center">
-            <i class="fa fa-code text-6xl text-yellow-500"></i>
-          </div>
-          <div class="p-6">
-            <h3 class="text-xl font-bold mb-2">文件HEX查看器</h3>
-            <p class="text-gray-600 mb-4">以十六进制形式查看文件内容，开发者必备</p>
-            <a href="tools/hex-viewer.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
-              使用工具 <i class="fa fa-arrow-right ml-2"></i>
-            </a>
-          </div>
-        </div>
+  <!-- 屏幕检测工具 -->
+  <div class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="屏幕检测工具 分辨率 屏幕尺寸 像素密度">
+    <div class="h-40 bg-green-50 flex items-center justify-center cursor-pointer hover:bg-green-100 transition-colors" onclick="window.location.href='screen.html'">
+      <i class="fa fa-desktop text-6xl text-secondary"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">屏幕检测工具</h3>
+      <p class="text-gray-600 mb-4">检测屏幕分辨率、尺寸和像素密度等信息</p>
+      <a href="screen.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
 
-        <!-- 图片大小转换工具 -->
-        <div id="image" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover">
-          <div class="h-40 bg-red-50 flex items-center justify-center">
-            <i class="fa fa-picture-o text-6xl text-red-500"></i>
-          </div>
-          <div class="p-6">
-            <h3 class="text-xl font-bold mb-2">图片大小转换</h3>
-            <p class="text-gray-600 mb-4">调整图片尺寸和压缩图片，保持最佳质量</p>
-            <a href="tools/image-resizer.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
-              使用工具 <i class="fa fa-arrow-right ml-2"></i>
-            </a>
-          </div>
-        </div>
+  <!-- 文件格式转换工具 -->
+  <div id="file" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="文件格式转换 文件转换 格式转换 文档转换">
+    <div class="h-40 bg-purple-50 flex items-center justify-center cursor-pointer hover:bg-purple-100 transition-colors" onclick="window.location.href='file-converter.html'">
+      <i class="fa fa-exchange text-6xl text-accent"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">文件格式转换</h3>
+      <p class="text-gray-600 mb-4">支持多种文件格式之间的转换，简单高效</p>
+      <a href="file-converter.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
 
-        <!-- 图片简单修改工具 -->
-        <div class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover">
-          <div class="h-40 bg-indigo-50 flex items-center justify-center">
-            <i class="fa fa-crop text-6xl text-indigo-500"></i>
-          </div>
-          <div class="p-6">
-            <h3 class="text-xl font-bold mb-2">图片简单修改</h3>
-            <p class="text-gray-600 mb-4">裁剪、旋转、添加滤镜等基础图片编辑功能</p>
-            <a href="tools/image-editor.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
-              使用工具 <i class="fa fa-arrow-right ml-2"></i>
-            </a>
-          </div>
-        </div>
-      </div>
+  <!-- 文件HEX查看工具 -->
+  <div class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="文件HEX查看器 十六进制 代码查看 开发者工具">
+    <div class="h-40 bg-yellow-50 flex items-center justify-center cursor-pointer hover:bg-yellow-100 transition-colors" onclick="window.location.href='hex-viewer.html'">
+      <i class="fa fa-code text-6xl text-yellow-500"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">文件HEX查看器</h3>
+      <p class="text-gray-600 mb-4">以十六进制形式查看文件内容，开发者必备</p>
+      <a href="hex-viewer.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- 图片大小转换工具 -->
+  <div id="image" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="图片大小转换 图片压缩 调整尺寸 图片处理">
+    <div class="h-40 bg-red-50 flex items-center justify-center cursor-pointer hover:bg-red-100 transition-colors" onclick="window.location.href='image-resizer.html'">
+      <i class="fa fa-picture-o text-6xl text-red-500"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">图片大小转换</h3>
+      <p class="text-gray-600 mb-4">调整图片尺寸和压缩图片，保持最佳质量</p>
+      <a href="image-resizer.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- 图片简单修改工具 -->
+  <div class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="图片简单修改 图片编辑 裁剪 旋转 滤镜">
+    <div class="h-40 bg-indigo-50 flex items-center justify-center cursor-pointer hover:bg-indigo-100 transition-colors" onclick="window.location.href='image-editor.html'">
+      <i class="fa fa-crop text-6xl text-indigo-500"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">图片简单修改</h3>
+      <p class="text-gray-600 mb-4">裁剪、旋转、添加滤镜等基础图片编辑功能</p>
+      <a href="image-editor.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- 图片对比工具 -->
+  <div id="image-compare" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="图片对比工具 图片差异 滑动对比 图片比较">
+    <div class="h-40 bg-teal-50 flex items-center justify-center cursor-pointer hover:bg-teal-100 transition-colors" onclick="window.location.href='image-compare.html'">
+      <i class="fa fa-balance-scale text-6xl text-teal-500"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">图片对比工具</h3>
+      <p class="text-gray-600 mb-4">支持左右滑动/叠层对比图片，精准识别细节差异</p>
+      <a href="image-compare.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- 文件转Base64互转 -->
+  <div id="base64-convert" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="文件Base64互转 编码 解码 base64转换">
+    <div class="h-40 bg-orange-50 flex items-center justify-center cursor-pointer hover:bg-orange-100 transition-colors" onclick="window.location.href='base64-converter.html'">
+      <i class="fa fa-file-code-o text-6xl text-orange-500"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">文件Base64互转</h3>
+      <p class="text-gray-600 mb-4">实现文件与Base64编码双向转换，支持多格式文件</p>
+      <a href="base64-converter.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- 进制转换器 -->
+  <div id="radix-convert" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="进制转换器 二进制 八进制 十进制 十六进制">
+    <div class="h-40 bg-pink-50 flex items-center justify-center cursor-pointer hover:bg-pink-100 transition-colors" onclick="window.location.href='radix-converter.html'">
+      <i class="fa fa-calculator text-6xl text-pink-500"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">进制转换器</h3>
+      <p class="text-gray-600 mb-4">支持二进制、八进制、十进制、十六进制实时互转</p>
+      <a href="radix-converter.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- 贴片电阻查询 -->
+  <div id="resistor-lookup" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="贴片电阻查询 电阻阻值 色环 电子元件 参数">
+    <div class="h-40 bg-gray-50 flex items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors" onclick="window.location.href='resistor-lookup.html'">
+      <i class="fa fa-microchip text-6xl text-gray-500"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">贴片电阻查询</h3>
+      <p class="text-gray-600 mb-4">通过色环/型号快速查询电阻阻值、精度及功率参数</p>
+      <a href="resistor-lookup.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- 贴片EIXF信息查看 -->
+  <div id="eixf-viewer" class="bg-white rounded-xl shadow-md overflow-hidden tool-card-hover" data-name="贴片EIXF信息查看 元件规格 EIXF解析 参数">
+    <div class="h-40 bg-lime-50 flex items-center justify-center cursor-pointer hover:bg-lime-100 transition-colors" onclick="window.location.href='eixf-viewer.html'">
+      <i class="fa fa-info-circle text-6xl text-lime-600"></i>
+    </div>
+    <div class="p-6">
+      <h3 class="text-xl font-bold mb-2">贴片EIXF信息查看</h3>
+      <p class="text-gray-600 mb-4">解析贴片元件EIXF文件，展示规格、参数及兼容信息</p>
+      <a href="eixf-viewer.html" class="inline-flex items-center text-primary font-medium hover:text-accent transition-colors">
+        使用工具 <i class="fa fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
+</div>
+
 
       <!-- 加载更多按钮 -->
       <div class="text-center mt-12">
@@ -378,13 +545,89 @@
     <i class="fa fa-arrow-up"></i>
   </button>
 
+  <!-- JavaScript功能实现 -->
   <script>
-    // 移动端菜单切换
+    // 夜间模式切换功能
+    // 获取主题切换按钮元素
+    const themeToggle = document.getElementById('themeToggle');
+    const mobileThemeToggle = document.getElementById('mobileThemeToggle');
+    const body = document.body;
+    // 定义切换按钮的图标
+    const moonIcon = '<i class="fa fa-moon-o mr-1"></i> 切换主题';
+    const sunIcon = '<i class="fa fa-sun-o mr-1"></i> 切换主题';
+    
+    // 检查本地存储中的主题偏好，保持用户上次选择
+    if (localStorage.getItem('darkMode') === 'true') {
+      body.classList.add('dark-mode');
+      themeToggle.innerHTML = sunIcon;
+      mobileThemeToggle.innerHTML = sunIcon;
+    }
+    
+    // 桌面端主题切换按钮事件监听
+    themeToggle.addEventListener('click', () => {
+      toggleDarkMode();
+    });
+    
+    // 移动端主题切换按钮事件监听
+    mobileThemeToggle.addEventListener('click', () => {
+      toggleDarkMode();
+    });
+    
+    // 切换暗黑模式核心函数
+    function toggleDarkMode() {
+      // 切换body元素上的dark-mode类
+      const isDark = body.classList.toggle('dark-mode');
+      // 将用户偏好存储到本地存储
+      localStorage.setItem('darkMode', isDark);
+      
+      // 根据当前模式更新按钮图标
+      if (isDark) {
+        themeToggle.innerHTML = sunIcon;
+        mobileThemeToggle.innerHTML = sunIcon;
+      } else {
+        themeToggle.innerHTML = moonIcon;
+        mobileThemeToggle.innerHTML = moonIcon;
+      }
+    }
+
+    // 搜索功能实现
+    // 获取搜索输入框和工具卡片元素
+    const searchInput = document.getElementById('searchInput');
+    const toolCards = document.querySelectorAll('[data-name]');
+    
+    // 监听搜索框输入事件
+    searchInput.addEventListener('input', () => {
+      // 获取搜索词并转为小写
+      const searchTerm = searchInput.value.toLowerCase().trim();
+      
+      // 搜索词为空时显示所有工具
+      if (searchTerm === '') {
+        toolCards.forEach(card => {
+          card.style.display = 'block';
+        });
+        return;
+      }
+      
+      // 搜索词不为空时过滤工具
+      toolCards.forEach(card => {
+        // 获取工具卡片的搜索关键词
+        const toolName = card.getAttribute('data-name').toLowerCase();
+        // 检查是否匹配搜索词
+        const matchesSearch = toolName.includes(searchTerm);
+        
+        // 根据匹配结果显示或隐藏卡片
+        card.style.display = matchesSearch ? 'block' : 'none';
+      });
+    });
+
+    // 移动端菜单切换功能
     const menuBtn = document.getElementById('menuBtn');
     const mobileMenu = document.getElementById('mobileMenu');
     
     menuBtn.addEventListener('click', () => {
+      // 切换移动端菜单的显示状态
       mobileMenu.classList.toggle('hidden');
+      // 根据菜单状态切换按钮图标
       menuBtn.innerHTML = mobileMenu.classList.contains('hidden') 
         ? '<i class="fa fa-bars text-xl"></i>' 
         : '<i class="fa fa-times text-xl"></i>';
@@ -393,6 +636,7 @@
     // 导航栏滚动效果
     const navbar = document.getElementById('navbar');
     window.addEventListener('scroll', () => {
+      // 当页面滚动超过50px时改变导航栏样式
       if (window.scrollY > 50) {
         navbar.classList.add('py-2', 'shadow-lg');
         navbar.classList.remove('py-3', 'shadow-md');
@@ -402,9 +646,10 @@
       }
     });
 
-    // 返回顶部按钮
+    // 返回顶部按钮功能
     const backToTopBtn = document.getElementById('backToTop');
     
+    // 监听页面滚动事件控制按钮显示/隐藏
     window.addEventListener('scroll', () => {
       if (window.scrollY > 300) {
         backToTopBtn.classList.remove('opacity-0', 'invisible');
@@ -415,6 +660,7 @@
       }
     });
     
+    // 点击按钮平滑滚动到顶部
     backToTopBtn.addEventListener('click', () => {
       window.scrollTo({
         top: 0,
@@ -424,38 +670,48 @@
 
     // 数字计数器动画
     const counters = document.querySelectorAll('.counter');
-    const speed = 200;
+    const speed = 200; // 动画速度控制
     
+    // 使用IntersectionObserver监测元素是否进入视口
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           const counter = entry.target;
+          // 获取目标数值
           const target = +counter.getAttribute('data-target');
+          // 当前显示数值
           const count = +counter.innerText;
+          // 计算每次增加的数值
           const increment = target / speed;
           
+          // 逐步增加数值直到达到目标
           if (count < target) {
             counter.innerText = Math.ceil(count + increment);
+            // 继续请求动画
             setTimeout(() => observer.observe(counter), 1);
           } else {
+            // 达到目标后添加单位
             counter.innerText = target + (target === 98 ? '%' : '+');
           }
         }
       });
-    }, { threshold: 0.5 });
+    }, { threshold: 0.5 }); // 元素50%进入视口时触发
     
+    // 对所有计数器应用监测
     counters.forEach(counter => {
       observer.observe(counter);
     });
 
-    // 平滑滚动
+    // 平滑滚动到锚点
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
       anchor.addEventListener('click', function(e) {
         e.preventDefault();
         
         const targetId = this.getAttribute('href');
+        // 跳过首页锚点
         if (targetId === '#') return;
         
+        // 滚动到目标元素
         const targetElement = document.querySelector(targetId);
         if (targetElement) {
           targetElement.scrollIntoView({

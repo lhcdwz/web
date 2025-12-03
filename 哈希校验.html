@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>文件哈希检测</title>
+  <style>
+    :root {
+      --primary-color: #007BFF;
+      --hover-color: #0056B3;
+      --border-color: #CCCCCC;
+      --hover-border-color: var(--primary-color);
+      --background-color: #FFFFFF;
+      --hover-background-color: #E9F5FF;
+      --gradient-btn: linear-gradient(to right, #007BFF, #00C6FF);
+    }
+
+    body {
+      font-family: "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #F5F7FA;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    #drop-area {
+      border: 2px dashed var(--border-color);
+      border-radius: 20px;
+      padding: 40px 30px;
+      background: white;
+      width: 100%;
+      max-width: 600px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    #drop-area:hover {
+      border-color: var(--hover-border-color);
+      background-color: var(--hover-background-color);
+    }
+
+    #drop-area::before {
+      content: "⬇️ 拖拽或点击上传文件";
+      font-size: 18px;
+      display: block;
+      color: #999;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      font-size: 26px;
+      color: var(--primary-color);
+    }
+
+    p {
+      font-size: 15px;
+      color: #555;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    .upload-btn {
+      margin-top: 10px;
+      padding: 10px 18px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .upload-btn:hover {
+      background: var(--hover-color);
+    }
+
+    #loading {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #777;
+      display: none;
+    }
+
+    #loading.spinner::after {
+      content: "";
+      display: inline-block;
+      margin-left: 10px;
+      width: 16px;
+      height: 16px;
+      border: 3px solid #ccc;
+      border-top-color: var(--primary-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #file-info {
+      margin-top: 20px;
+      text-align: left;
+      color: #444;
+      display: none;
+      font-size: 14px;
+    }
+
+    #hash-results {
+      margin-top: 25px;
+      text-align: left;
+    }
+
+    .hash-item {
+      background: #f9f9f9;
+      border-radius: 12px;
+      padding: 10px 15px;
+      margin-bottom: 15px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+      word-break: break-word;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .hash-item span:first-child {
+      font-weight: bold;
+      color: #333;
+      min-width: 60px;
+    }
+
+    .hash-value {
+      flex: 1;
+      margin: 0 10px;
+      color: #666;
+    }
+
+    .copy-btn {
+      background-image: var(--gradient-btn);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: 0.3s;
+    }
+
+    .copy-btn:hover {
+      background-image: linear-gradient(to right, #0056B3, #0096FF);
+    }
+
+    @media (max-width: 600px) {
+      #drop-area {
+        padding: 25px 20px;
+      }
+      .hash-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .copy-btn {
+        align-self: flex-end;
+        margin-top: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="drop-area">
+    <h1>文件哈希检测</h1>
+    <p>支持 MD5、SHA1、SHA256、SHA512</p>
+
+    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">选择文件</button>
+    <input type="file" id="fileInput" />
+
+    <div id="loading" class="spinner">正在计算哈希值...</div>
+
+    <div id="file-info">
+      <p><strong>文件名称：</strong><span id="file-name"></span></p>
+      <p><strong>文件类型：</strong><span id="file-type"></span></p>
+      <p><strong>文件大小：</strong><span id="file-size"></span></p>
+      <p><strong>最后修改：</strong><span id="file-modified"></span></p>
+    </div>
+
+    <div id="hash-results"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const dropArea = document.getElementById('drop-area');
+      const hashResults = document.getElementById('hash-results');
+      const loading = document.getElementById('loading');
+
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(event => {
+        dropArea.addEventListener(event, preventDefaults);
+      });
+
+      dropArea.addEventListener('drop', e => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          calculateHashes(files[0]);
+        }
+      });
+
+      document.getElementById('fileInput').addEventListener('change', function () {
+        if (this.files.length > 0) {
+          calculateHashes(this.files[0]);
+        }
+      });
+
+      function calculateHashes(file) {
+        loading.style.display = 'block';
+        hashResults.innerHTML = '';
+        displayFileInfo(file);
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          try {
+            const wordArray = CryptoJS.lib.WordArray.create(e.target.result);
+            const hashes = {
+              MD5: CryptoJS.MD5(wordArray).toString(),
+              SHA1: CryptoJS.SHA1(wordArray).toString(),
+              SHA256: CryptoJS.SHA256(wordArray).toString(),
+              SHA512: CryptoJS.SHA512(wordArray).toString()
+            };
+            Object.entries(hashes).forEach(([label, hash]) => {
+              const item = createHashItem(label, hash);
+              hashResults.insertAdjacentHTML('beforeend', item);
+            });
+
+            // 绑定复制按钮事件
+            document.querySelectorAll('.copy-btn').forEach(btn => {
+              btn.addEventListener('click', () => {
+                navigator.clipboard.writeText(btn.dataset.hash).then(() => {
+                  btn.textContent = "已复制";
+                  setTimeout(() => { btn.textContent = "复制"; }, 1500);
+                }).catch(() => {
+                  alert("复制失败，请手动复制");
+                });
+              });
+            });
+
+          } catch (error) {
+            alert('计算哈希值失败，请重试。');
+          } finally {
+            loading.style.display = 'none';
+          }
+        };
+        reader.onerror = function () {
+          loading.style.display = 'none';
+          alert('文件读取失败，请重试。');
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      function createHashItem(label, hash) {
+        return `
+          <div class="hash-item">
+            <span>${label}:</span>
+            <span class="hash-value">${hash}</span>
+            <button class="copy-btn" data-hash="${hash}">复制</button>
+          </div>`;
+      }
+
+      function displayFileInfo(file) {
+        document.getElementById('file-name').textContent = file.name;
+        document.getElementById('file-type').textContent = file.type || '未知类型';
+        document.getElementById('file-size').textContent = formatBytes(file.size);
+        document.getElementById('file-modified').textContent = new Date(file.lastModified).toLocaleString();
+        document.getElementById('file-info').style.display = 'block';
+      }
+
+      function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+    });
+  </script>
+</body>
+</html>
