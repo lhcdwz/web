@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贴片电阻样式</title>
+    <style>
+        /* 定义 CSS 变量 */
+        :root {
+            --resistor-color: #000000; /* 电阻（中间）默认黑色 */
+            --terminal-color: #e0e0e0; /* 金属端（两边）默认银色 */
+            
+        }
+
+             /* // -resistor-width	设置电阻器黑色部分（中间）的宽度。
+            // --resistor-height	设置电阻器的高度。
+            // --terminal-width	设置电阻器端子（焊接部分）的宽度。
+            // --terminal-height	设置电阻器端子的高度。 */
+
+        /* 电阻容器 */
+        .resistor {
+            width: calc(var(--resistor-width) + 2 * var(--terminal-width));
+            height: var(--terminal-height);
+            position: relative;
+            margin: 50px auto;
+        }
+
+        /* 电阻体 */
+        .resistor-body {
+            width: var(--resistor-width);
+            height: var(--resistor-height);
+            background-color: var(--resistor-color);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: calc(var(--resistor-width) / 2);
+        }
+
+        /* 金属端 */
+        .resistor-terminal {
+            width: var(--terminal-width);
+            height: var(--terminal-height);
+            background-color: var(--terminal-color);
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* 左侧金属端 */
+        .resistor-terminal.left {
+            left: 0;
+        }
+
+        /* 右侧金属端 */
+        .resistor-terminal.right {
+            right: 0;
+        }
+
+        /* 选择器样式 */
+        .resistor-selector {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .resistor-selector label {
+            font-size: 16px;
+            margin-right: 10px;
+        }
+
+        .resistor-selector select {
+            font-size: 16px;
+            padding: 5px;
+        }
+
+        /* 输入框样式 */
+        .input-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .input-container input {
+            font-size: 16px;
+            padding: 5px;
+        }
+
+        /* 功率显示样式 */
+        .power-display {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+        /* 查询按钮样式 */
+        button {
+            text-align: center;
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff; /* 设置按钮背景颜色 */
+            color: #fff; /* 设置按钮文字颜色，确保可读性 */
+            border: none; /* 去掉默认边框 */
+            border-radius: 5px; /* 设置按钮圆角 */
+        }
+
+        
+    </style>
+</head>
+<body>
+    <div class="resistor">
+        <div class="resistor-body" id="resistor-text">104</div>
+        <div class="resistor-terminal left"></div>
+        <div class="resistor-terminal right"></div>
+    </div>
+
+    <div class="resistor-selector">
+        <label for="resistor-type">选择电阻类型：</label>
+        <select id="resistor-type">
+            <option value="0201">0201</option>
+            <option value="0402">0402</option>
+            <option value="0603">0603</option>
+            <option value="0805">0805</option>
+            <option value="1206" selected>1206</option> <!-- 默认选中 1206 -->
+            <option value="1210">1210</option>
+            <option value="1812">1812</option>
+            <option value="2010">2010</option>
+            <option value="2512">2512</option>
+        </select>
+    </div>
+
+    <div class="input-container">
+        <input type="text" id="resistorCode" placeholder="请输入丝印代码（如4R7、18A、103、6802）" oninput="this.value = this.value.toUpperCase()">
+  
+    </div>   
+    <div class="input-container">
+       
+    <button onclick="getResistorValue()">查询</button>
+    </div>   
+
+    
+    <div class="power-display">
+      <div id="result"></div>  
+    </div>
+
+    <div class="power-display">
+        功率：<span id="power-value">空</span>
+    </div>
+    
+
+    <script>
+        // 电阻类型对应的尺寸和功率（单位：px）
+        const resistorSizes = {
+
+            // 中间宽度     高度         两边端子宽度          功率       
+    '0201': { width: 14, height: 10, terminalWidth: 3, power: '1/20W' },
+    '0402': { width: 30, height: 20, terminalWidth: 5, power: '1/16W' },
+    '0603': { width: 46, height: 30, terminalWidth: 7, power: '1/10W' },
+    '0805': { width: 60, height: 50, terminalWidth: 10, power: '1/8W' },
+    '1206': { width: 90, height: 60, terminalWidth: 15, power: '1/4W' },
+    '1210': { width: 90, height: 100, terminalWidth: 15, power: '1/3W' },
+    '1812': { width: 150, height: 120, terminalWidth: 18, power: '1/2W' },
+    '2010': { width: 160, height: 100, terminalWidth: 20, power: '3/4W' },
+    '2512': { width: 200, height: 120, terminalWidth: 25, power: '1W' },
+};
+
+        // 获取 DOM 元素
+        const resistor = document.querySelector('.resistor');
+        const resistorBody = document.querySelector('.resistor-body');
+        const resistorTerminals = document.querySelectorAll('.resistor-terminal');
+        const resistorTypeSelect = document.getElementById('resistor-type');
+        const resistorInput = document.getElementById('resistorCode');
+        const resistorText = document.getElementById('resistor-text');
+        const powerValue = document.getElementById('power-value');
+
+        // 监听选择器变化
+        resistorTypeSelect.addEventListener('change', (event) => {
+            const type = event.target.value;
+            const size = resistorSizes[type];
+
+            // -resistor-width	设置电阻器黑色部分（中间）的宽度。
+            // --resistor-height	设置电阻器的高度。
+            // --terminal-width	设置电阻器端子（焊接部分）的宽度。
+            // --terminal-height	设置电阻器端子的高度。
+            // 更新 CSS 变量
+            resistor.style.setProperty('--resistor-width', `${size.width}px`);
+            resistor.style.setProperty('--resistor-height', `${size.height}px`);
+            resistor.style.setProperty('--terminal-width', `${size.terminalWidth}px`);
+            resistor.style.setProperty('--terminal-height', `${size.height}px`);
+
+            // 更新功率显示
+            powerValue.textContent = size.power;
+        });
+
+        // 监听输入框变化
+        resistorInput.addEventListener('input', (event) => {
+            let value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            event.target.value = value;
+            resistorText.textContent = value;
+        });
+
+        // 初始化默认值
+        resistorTypeSelect.dispatchEvent(new Event('change'));
+    </script>
+   <script src="./resistorCalculator.js"></script>
+
+</body>
+</html>

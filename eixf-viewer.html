@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修复版图片元数据查看器（高德地图版）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Exif解析库 -->
+    <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+    <!-- 引入高德地图JS API（标准地图） -->
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=1.4.15&key=24a7a55e32f2d465e3d8a09b0d5d6"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        neutral: '#1F2937',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .shadow-soft { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+            #map { width: 100%; height: 100%; border-radius: 0.5rem; }
+        }
+    </style>
+</head>
+
+<body class="font-inter bg-gray-50 text-neutral min-h-screen">
+<header class="bg-white shadow-sm py-6">
+    <div class="container mx-auto px-4 md:px-6">
+        <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-neutral flex items-center">
+            <i class="fa fa-camera-retro text-primary mr-3"></i>
+            修复版图片元数据查看器（高德地图）
+        </h1>
+        <p class="text-gray-500 mt-1">本地解析图片元数据（相机参数/地理位置等），数据不上传服务器</p>
+    </div>
+</header>
+
+<main class="container mx-auto px-4 md:px-6 py-8">
+    <!-- 上传区域 -->
+    <section class="mb-10">
+        <div class="bg-white rounded-xl shadow-soft p-6 md:p-8 transition-all duration-300 hover:shadow-lg">
+            <h2 class="text-xl font-semibold mb-4 flex items-center">
+                <i class="fa fa-upload text-primary mr-2"></i>上传图片
+            </h2>
+            <div id="dropArea" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors duration-300">
+                <i class="fa fa-picture-o text-5xl text-gray-400 mb-4"></i>
+                <p class="mb-4 text-gray-600">拖放图片到此处，或点击选择图片</p>
+                <label class="inline-block bg-primary hover:bg-primary/90 text-white font-medium py-2 px-6 rounded-lg cursor-pointer transition-all duration-300 transform hover:scale-105">
+                    <i class="fa fa-file-image-o mr-2"></i>选择图片
+                    <input type="file" id="fileInput" accept="image/*" class="hidden">
+                </label>
+                <p class="mt-4 text-sm text-gray-500">支持 JPG、PNG、TIFF、WebP 等主流图片格式</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 图片与地图显示合并区域 -->
+    <section id="previewSection" class="mb-10 hidden">
+        <div class="bg-white rounded-xl shadow-soft p-6 md:p-8">
+            <h2 class="text-xl font-semibold mb-4 flex items-center">
+                <i class="fa fa-eye text-primary mr-2"></i>图片预览 & 地理信息
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 左侧图片 -->
+                <div>
+                    <div class="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center p-4 min-h-[300px]">
+                        <img id="previewImage" src="" alt="图片预览" class="max-w-full max-h-[500px] object-contain">
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+                        <div class="bg-gray-50 p-3 rounded-lg"><span class="text-gray-500">文件大小：</span><span id="fileSize" class="font-medium">-</span></div>
+                        <div class="bg-gray-50 p-3 rounded-lg"><span class="text-gray-500">格式：</span><span id="fileFormat" class="font-medium">-</span></div>
+                        <div class="bg-gray-50 p-3 rounded-lg"><span class="text-gray-500">尺寸：</span><span id="imageDimension" class="font-medium">-</span></div>
+                        <div class="bg-gray-50 p-3 rounded-lg"><span class="text-gray-500">修改时间：</span><span id="fileModifyTime" class="font-medium">-</span></div>
+                    </div>
+                </div>
+
+                <!-- 右侧地图 -->
+                <div>
+                    <div id="locationContainer" class="hidden">
+                        <h3 class="font-medium text-lg mb-3 flex items-center"><i class="fa fa-map-marker text-red-500 mr-2"></i>拍摄地理位置</h3>
+                        <div class="bg-gray-100 rounded-lg p-2 h-[250px] mb-4 relative">
+                            <div id="map" class="w-full h-full rounded"></div>
+                            <div id="mapLoading" class="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg hidden">
+                                <i class="fa fa-spinner fa-spin text-primary mr-2"></i>加载地图中...
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div class="bg-gray-50 p-3 rounded-lg"><span class="text-gray-500">纬度：</span><span id="latitude" class="font-medium">-</span></div>
+                            <div class="bg-gray-50 p-3 rounded-lg"><span class="text-gray-500">经度：</span><span id="longitude" class="font-medium">-</span></div>
+                            <div class="bg-gray-50 p-3 rounded-lg md:col-span-2">
+                                <span class="text-gray-500">坐标链接：</span>
+                                <a id="coordLink" href="" target="_blank" class="text-primary hover:underline">-</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="noLocationContainer" class="hidden h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                        <div class="text-center text-gray-500">
+                            <i class="fa fa-map-o text-4xl mb-2"></i>
+                            <p>该图片未包含GPS地理位置信息</p>
+                            <p class="text-xs mt-1">（请确保拍照时开启“位置信息”）</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 元数据详情 -->
+    <section id="metadataSection" class="mb-10 hidden">
+        <div class="bg-white rounded-xl shadow-soft p-6 md:p-8">
+            <h2 class="text-xl font-semibold mb-6 flex items-center"><i class="fa fa-list-alt text-primary mr-2"></i>图片元数据详情</h2>
+            <div class="grid metadata-grid gap-4 mb-8" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr));">
+                <div class="p-4 border rounded-lg"><h3 class="text-sm text-gray-500 mb-1"><i class="fa fa-camera mr-1"></i>相机制造商</h3><p id="cameraMakeValue">-</p></div>
+                <div class="p-4 border rounded-lg"><h3 class="text-sm text-gray-500 mb-1"><i class="fa fa-mobile mr-1"></i>相机型号</h3><p id="cameraModelValue">-</p></div>
+                <div class="p-4 border rounded-lg"><h3 class="text-sm text-gray-500 mb-1"><i class="fa fa-clock-o mr-1"></i>拍摄时间</h3><p id="dateTakenValue">-</p></div>
+                <div class="p-4 border rounded-lg"><h3 class="text-sm text-gray-500 mb-1"><i class="fa fa-search mr-1"></i>焦距</h3><p id="focalLengthValue">-</p></div>
+                <div class="p-4 border rounded-lg"><h3 class="text-sm text-gray-500 mb-1"><i class="fa fa-circle-o mr-1"></i>光圈</h3><p id="apertureValue">-</p></div>
+                <div class="p-4 border rounded-lg"><h3 class="text-sm text-gray-500 mb-1"><i class="fa fa-tachometer mr-1"></i>快门速度</h3><p id="shutterSpeedValue">-</p></div>
+                <div class="p-4 border rounded-lg"><h3 class="text-sm text-gray-500 mb-1"><i class="fa fa-sun-o mr-1"></i>ISO</h3><p id="isoValue">-</p></div>
+                <div class="p-4 border rounded-lg"><h3 class="text-sm text-gray-500 mb-1"><i class="fa fa-paint-brush mr-1"></i>色彩空间</h3><p id="colorSpaceValue">-</p></div>
+                <div class="p-4 border rounded-lg"><h3 class="text-sm text-gray-500 mb-1"><i class="fa fa-compress mr-1"></i>压缩方式</h3><p id="compressionValue">-</p></div>
+                <div class="p-4 border rounded-lg"><h3 class="text-sm text-gray-500 mb-1"><i class="fa fa-code mr-1"></i>处理软件</h3><p id="softwareValue">-</p></div>
+            </div>
+
+            <div class="border-t pt-4">
+                <button id="showAllMetadata" class="text-primary flex items-center">
+                    <span>查看完整元数据（JSON格式）</span><i class="fa fa-chevron-down ml-2" id="toggleIcon"></i>
+                </button>
+                <div id="allMetadata" class="hidden mt-4 p-4 bg-gray-50 rounded text-sm">
+                    <div class="flex justify-between mb-2">
+                        <p class="text-gray-500">以下为完整解析数据</p>
+                        <button id="copyMetadata" class="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded flex items-center"><i class="fa fa-copy mr-1"></i>复制</button>
+                    </div>
+                    <pre id="fullMetadata" class="text-gray-700 overflow-x-auto max-h-[500px] whitespace-pre-wrap"></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 错误与无元数据提示 -->
+    <section id="errorSection" class="hidden mb-10">
+        <div class="bg-red-50 border border-red-100 rounded-xl p-6">
+            <h3 class="text-lg font-medium text-red-800">操作出错</h3>
+            <p class="text-red-700 mt-1" id="errorMessage"></p>
+        </div>
+    </section>
+    <section id="noMetadataSection" class="hidden mb-10">
+        <div class="bg-yellow-50 border border-yellow-100 rounded-xl p-6">
+            <h3 class="text-lg font-medium text-yellow-800">未检测到元数据</h3>
+            <p class="text-yellow-700">请尝试上传手机拍摄的原始JPG图片。</p>
+        </div>
+    </section>
+</main>
+
+<footer class="bg-white border-t py-6 text-center text-gray-500 text-sm">
+    <p>图片元数据查看器 | 本地解析，不上传服务器</p>
+    <p>依赖库：exifr、Tailwind CSS、高德地图</p>
+</footer>
+
+<script>
+const dom = {
+    dropArea: document.getElementById('dropArea'),
+    fileInput: document.getElementById('fileInput'),
+    previewSection: document.getElementById('previewSection'),
+    previewImage: document.getElementById('previewImage'),
+    fileSize: document.getElementById('fileSize'),
+    fileFormat: document.getElementById('fileFormat'),
+    imageDimension: document.getElementById('imageDimension'),
+    fileModifyTime: document.getElementById('fileModifyTime'),
+    locationContainer: document.getElementById('locationContainer'),
+    noLocationContainer: document.getElementById('noLocationContainer'),
+    latitude: document.getElementById('latitude'),
+    longitude: document.getElementById('longitude'),
+    coordLink: document.getElementById('coordLink'),
+    map: document.getElementById('map'),
+    mapLoading: document.getElementById('mapLoading'),
+    metadataSection: document.getElementById('metadataSection'),
+    errorSection: document.getElementById('errorSection'),
+    noMetadataSection: document.getElementById('noMetadataSection'),
+    errorMessage: document.getElementById('errorMessage'),
+    cameraMakeValue: document.getElementById('cameraMakeValue'),
+    cameraModelValue: document.getElementById('cameraModelValue'),
+    dateTakenValue: document.getElementById('dateTakenValue'),
+    focalLengthValue: document.getElementById('focalLengthValue'),
+    apertureValue: document.getElementById('apertureValue'),
+    shutterSpeedValue: document.getElementById('shutterSpeedValue'),
+    isoValue: document.getElementById('isoValue'),
+    colorSpaceValue: document.getElementById('colorSpaceValue'),
+    compressionValue: document.getElementById('compressionValue'),
+    softwareValue: document.getElementById('softwareValue'),
+    showAllMetadata: document.getElementById('showAllMetadata'),
+    allMetadata: document.getElementById('allMetadata'),
+    toggleIcon: document.getElementById('toggleIcon'),
+    fullMetadata: document.getElementById('fullMetadata'),
+    copyMetadata: document.getElementById('copyMetadata'),
+};
+
+let amapInstance = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    dom.fileInput.addEventListener('change', handleFileSelect);
+    dom.dropArea.addEventListener('dragover', e => { e.preventDefault(); dom.dropArea.classList.add('border-primary','bg-blue-50'); });
+    dom.dropArea.addEventListener('dragleave', () => dom.dropArea.classList.remove('border-primary','bg-blue-50'));
+    dom.dropArea.addEventListener('drop', e => {
+        e.preventDefault(); dom.dropArea.classList.remove('border-primary','bg-blue-50');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) processImageFile(e.dataTransfer.files[0]);
+    });
+    dom.dropArea.addEventListener('click', e => { if (!e.target.closest('label')) dom.fileInput.click(); });
+    dom.showAllMetadata.addEventListener('click',()=>{ dom.allMetadata.classList.toggle('hidden'); dom.toggleIcon.classList.toggle('rotate-180'); });
+    dom.copyMetadata.addEventListener('click',()=>{ navigator.clipboard.writeText(dom.fullMetadata.textContent); });
+});
+
+function handleFileSelect(e){ const file=e.target.files[0]; if(file) processImageFile(file); e.target.value=''; }
+
+async function processImageFile(file){
+    try{
+        showBasicFileInfo(file);
+        const previewUrl=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=e=>rej(e); r.readAsDataURL(file); });
+        dom.previewImage.src=previewUrl; dom.previewSection.classList.remove('hidden');
+        dom.errorSection.classList.add('hidden'); dom.noMetadataSection.classList.add('hidden'); dom.metadataSection.classList.add('hidden');
+        const metadata=await exifr.parse(file,{gps:true,xmp:true,exif:true,iptc:true});
+        if(metadata && Object.keys(metadata).length>0){
+            displayMetadata(metadata); handleGeolocation(metadata);
+            dom.metadataSection.classList.remove('hidden');
+            dom.fullMetadata.textContent=JSON.stringify(metadata,null,2);
+        }else dom.noMetadataSection.classList.remove('hidden');
+    }catch(err){ showError("处理图片出错："+err.message); }
+}
+
+function showBasicFileInfo(file){
+    dom.fileSize.textContent=(file.size/1024/1024).toFixed(2)+" MB";
+    dom.fileFormat.textContent=(file.type.split('/')[1]||"未知").toUpperCase();
+    dom.fileModifyTime.textContent=new Date(file.lastModified).toLocaleString();
+    const img=new Image(); img.onload=function(){ dom.imageDimension.textContent=`${this.width}×${this.height}`; URL.revokeObjectURL(this.src); };
+    img.src=URL.createObjectURL(file);
+}
+
+function displayMetadata(m){
+    dom.cameraMakeValue.textContent=m.Make||m.make||'未知';
+    dom.cameraModelValue.textContent=m.Model||m.model||'未知';
+    dom.dateTakenValue.textContent=m.DateTimeOriginal?new Date(m.DateTimeOriginal).toLocaleString():'未知';
+    dom.focalLengthValue.textContent=m.Focal
+    img.src = URL.createObjectURL(file);
+}
+
+function displayMetadata(metadata){
+    dom.cameraMakeValue.textContent = metadata.Make || "-";
+    dom.cameraModelValue.textContent = metadata.Model || "-";
+    dom.dateTakenValue.textContent = metadata.DateTimeOriginal || metadata.CreateDate || "-";
+    dom.focalLengthValue.textContent = metadata.FocalLength ? metadata.FocalLength + " mm" : "-";
+    dom.apertureValue.textContent = metadata.FNumber ? "f/" + metadata.FNumber : "-";
+    dom.shutterSpeedValue.textContent = metadata.ExposureTime ? metadata.ExposureTime + " s" : "-";
+    dom.isoValue.textContent = metadata.ISO || "-";
+    dom.colorSpaceValue.textContent = metadata.ColorSpace || "-";
+    dom.compressionValue.textContent = metadata.Compression || "-";
+    dom.softwareValue.textContent = metadata.Software || "-";
+}
+
+function handleGeolocation(metadata){
+    if(metadata.latitude && metadata.longitude){
+        dom.locationContainer.classList.remove('hidden');
+        dom.noLocationContainer.classList.add('hidden');
+        const lat = metadata.latitude;
+        const lng = metadata.longitude;
+        dom.latitude.textContent = lat.toFixed(6);
+        dom.longitude.textContent = lng.toFixed(6);
+        dom.coordLink.href = `https://www.amap.com/search?query=${lat},${lng}`;
+        dom.coordLink.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+        // 初始化高德地图
+        dom.mapLoading.classList.remove('hidden');
+        setTimeout(()=>{ // 等待DOM渲染
+            if(!amapInstance){
+                amapInstance = new AMap.Map("map", {
+                    center: [lng, lat],
+                    zoom: 15,
+                    resizeEnable: true,
+                });
+                const marker = new AMap.Marker({
+                    position: [lng, lat],
+                    map: amapInstance,
+                    title: "拍摄位置"
+                });
+            } else {
+                amapInstance.setCenter([lng, lat]);
+            }
+            dom.mapLoading.classList.add('hidden');
+        }, 100);
+    } else {
+        dom.locationContainer.classList.add('hidden');
+        dom.noLocationContainer.classList.remove('hidden');
+    }
+}
+
+function showError(msg){
+    dom.errorSection.classList.remove('hidden');
+    dom.errorMessage.textContent = msg;
+    dom.previewSection.classList.add('hidden');
+    dom.metadataSection.classList.add('hidden');
+    dom.noMetadataSection.classList.add('hidden');
+}
+</script>

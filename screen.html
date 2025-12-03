@@ -1,0 +1,49 @@
+<!-- 项目名称: 屏幕测试 -->
+<!-- 项目创建日期: 2025年01月28日 21时47分13秒 -->
+<!-- 项目作者: lhc -->
+<!-- 项目版本: V1.0.0 -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全屏纯色切换</title>
+    <style>
+        /* 设置 body 元素的样式 */
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            /* 初始颜色为红色 */
+            background-color: red;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <script>
+        // 定义一个颜色数组，包含多种颜色
+        const colors = ['red', 'green', 'blue', 'yellow', 'purple', 'orange', 'brown', 'gray', 'black', 'white'];
+        // 初始颜色索引为 0
+        let currentColorIndex = 0;
+
+        // 获取 body 元素
+        const body = document.body;
+
+        // 为 body 元素添加点击事件监听器
+        body.addEventListener('click', function () {
+            // 点击时，将颜色索引加 1
+            currentColorIndex = (currentColorIndex + 1) % colors.length;
+            // 获取下一个颜色
+            const nextColor = colors[currentColorIndex];
+            // 改变 body 元素的背景颜色
+            body.style.backgroundColor = nextColor;
+        });
+    </script>
+</body>
+
+</html>

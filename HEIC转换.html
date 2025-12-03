@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>HEIC → JPG 转换（保留EXIF）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{font-family:Arial,Helvetica,sans-serif;padding:20px;background:#f7f7f7;}
+#drop{
+    border:2px dashed #aaa;padding:40px;border-radius:10px;
+    background:#fff;text-align:center;cursor:pointer;transition:.3s; min-height:200px;
+}
+#drop.drag{border-color:#0084ff;background:#e7f1ff;}
+button{
+    padding:8px 14px;border:none;border-radius:5px;
+    background:#0084ff;color:#fff;cursor:pointer;margin-top:10px;
+}
+img{max-width:100%;margin-top:10px;border-radius:5px;}
+</style>
+</head>
+
+<body>
+
+<h2>HEIC → JPG（保留EXIF）</h2>
+<p>选择或拖入 HEIC 文件，本地转换并尽量保留拍摄信息。</p>
+
+<div id="drop">
+    点击选择文件 或 将 HEIC 拖拽到此
+    <br><br><small>支持批量转换</small>
+    <input id="input" type="file" accept=".heic,.HEIC" multiple style="display:none">
+</div>
+
+<!-- CDN libraries -->
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifreader@4.8.0/dist/exif-reader.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
+
+<script>
+// DOM
+const drop = document.getElementById("drop");
+const input = document.getElementById("input");
+
+// Click
+drop.addEventListener("click", ()=>input.click());
+
+// Drag & Drop
+drop.addEventListener("dragover", e=>{
+    e.preventDefault();
+    drop.classList.add("drag");
+});
+drop.addEventListener("dragleave", ()=>drop.classList.remove("drag"));
+drop.addEventListener("drop", e=>{
+    e.preventDefault();
+    drop.classList.remove("drag");
+    handleFiles(e.dataTransfer.files);
+});
+
+input.addEventListener("change", e=>handleFiles(e.target.files));
+
+async function handleFiles(files){
+    drop.innerHTML = ""; // 清空拖入提示
+    for(const f of files){
+        await convertOne(f);
+    }
+}
+
+async function convertOne(file){
+    // --- 1. 读取 HEIC EXIF ---
+    let exif={};
+    try{
+        const buf=await file.arrayBuffer();
+        exif = ExifReader.load(buf) || {};
+    }catch(e){
+        console.warn("EXIF 读取失败",e);
+    }
+
+    // --- 2. HEIC -> JPG ---
+    let jpgBlob;
+    try{
+        jpgBlob = await heic2any({
+            blob:file,
+            toType:"image/jpeg",
+            quality:0.92
+        });
+    }catch(e){
+        drop.innerHTML = `<p style="color:red">转换失败：${e}</p>`;
+        return;
+    }
+
+    let jpgData = await blobToDataURL(jpgBlob);
+
+    // --- 3. 写回 EXIF 到 JPG ---
+    try{
+        let exifObj = piexif.load(jpgData);
+
+        const copyMap = {
+            "Model":"Model",
+            "Make":"Make",
+            "DateTimeOriginal":"DateTimeOriginal",
+            "FNumber":"FNumber",
+            "ExposureTime":"ExposureTime",
+            "ISOSpeedRatings":"ISOSpeedRatings",
+            "FocalLength":"FocalLength",
+            "Orientation":"Orientation"
+        };
+
+        for(const k in copyMap){
+            if(exif?.[k]?.value){
+                exifObj["Exif"][piexif.ExifIFD[copyMap[k]]] = exif[k].value;
+            }
+        }
+
+        // GPS
+        if(exif?.GPSLatitude && exif?.GPSLongitude){
+            exifObj["GPS"][piexif.GPSIFD.GPSLatitude] = degToRational(exif.GPSLatitude.description);
+            exifObj["GPS"][piexif.GPSIFD.GPSLongitude] = degToRational(exif.GPSLongitude.description);
+            exifObj["GPS"][piexif.GPSIFD.GPSLatitudeRef] = exif.GPSLatitudeRef?.description || "N";
+            exifObj["GPS"][piexif.GPSIFD.GPSLongitudeRef] = exif.GPSLongitudeRef?.description || "E";
+        }
+
+        let exifBytes = piexif.dump(exifObj);
+        jpgData = piexif.insert(exifBytes, jpgData);
+
+    }catch(e){
+        console.warn("写 EXIF 失败",e);
+    }
+
+    // --- 4. 展示在同一拖入框 ---
+    const img=document.createElement("img");
+    img.src=jpgData;
+    const a=document.createElement("a");
+    a.href=jpgData;
+    a.download=file.name.replace(/\.heic$/i,".jpg");
+    a.innerHTML=`<button>下载 JPG</button>`;
+    
+    drop.appendChild(img);
+    drop.appendChild(a);
+}
+
+// Utils
+function blobToDataURL(blob){
+    return new Promise(res=>{
+        const r=new FileReader();
+        r.onload=()=>res(r.result);
+        r.readAsDataURL(blob);
+    });
+}
+
+function degToRational(val){
+    const v=parseFloat(val);
+    const deg=Math.floor(v);
+    const min=Math.floor((v-deg)*60);
+    const sec=(v-deg-min/60)*3600;
+    return [
+        [deg,1],
+        [min,1],
+        [Math.floor(sec*100),100]
+    ];
+}
+</script>
+
+</body>
+</html>

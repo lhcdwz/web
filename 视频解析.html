@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频帧提取工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        dark: '#1E293B',
+                        light: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto { content-visibility: auto; }
+            .drag-over { @apply border-primary bg-blue-50; }
+            .thumbnail-active { @apply ring-2 ring-primary scale-110 z-10; }
+            .scrollbar-hide::-webkit-scrollbar { display: none; }
+            .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+            .tooltip { @apply relative; }
+            .tooltip:hover::after {
+                content: attr(data-tooltip);
+                @apply absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-dark text-white text-xs rounded whitespace-nowrap z-50 shadow-sm;
+            }
+            .info-card { @apply bg-white rounded-lg shadow-md p-4 text-sm mb-4 mx-4; padding-bottom: 0.5rem;}
+            .info-item { @apply flex justify-between py-1.5 border-b border-gray-100 last:border-0; }
+            .info-label { @apply text-gray-500 w-1/3; }
+            .info-value { @apply text-gray-800 font-medium w-2/3 truncate; }
+            .info-header { @apply flex justify-between items-center cursor-pointer; }
+            .info-title { @apply font-medium text-gray-900 flex items-center text-lg; }
+            .info-content { @apply max-h-0 overflow-hidden transition-all duration-300; max-height: 25px;}
+            .info-content.expanded { @apply max-h-96 mt-2; }
+            .video-container { @apply mx-4 pb-4; } /* 添加底部内边距 */
+        }
+        .mb-8 {
+    margin-bottom: 1rem;
+}
+    </style>
+</head>
+<body class="font-inter bg-gray-50 min-h-screen flex flex-col">
+    <!-- 顶部导航 -->
+    <header class="bg-white shadow-sm py-4 px-6 md:px-12">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-film text-primary text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold text-dark">视频帧提取工具</h1>
+            </div>
+            <div class="text-sm text-gray-500">拖放视频，选择帧，导出为图片</div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-8 md:py-12">
+        <!-- 视频和拖放区域 -->
+        <div id="videoDropContainer" class="border-2 border-dashed border-gray-300 rounded-xl overflow-hidden bg-white shadow-sm mb-8 transition-all duration-300">
+            <!-- 初始拖放提示 -->
+            <div id="dropPrompt" class="p-8 md:p-12 text-center">
+                <div class="max-w-md mx-auto">
+                    <i class="fa fa-cloud-upload text-5xl text-gray-400 mb-4"></i>
+                    <h2 class="text-xl font-semibold text-gray-700 mb-2">拖放视频文件到此处</h2>
+                    <p class="text-gray-500 mb-6">或点击选择文件</p>
+                    <button id="selectFileBtn" class="tooltip inline-block bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg cursor-pointer transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 w-full" data-tooltip="点击选择本地视频文件">
+                        <i class="fa fa-file-video-o mr-2"></i>选择视频文件
+                    </button>
+                    <input type="file" id="fileInput" accept="video/*" class="hidden">
+                    <p class="text-xs text-gray-400 mt-4">支持 MP4、WebM 等常见视频格式</p>
+                </div>
+            </div>
+
+            <!-- 视频信息（单独显示在视频上方） -->
+            <div id="videoInfoCard" class="info-card hidden">
+                <div class="info-header" id="infoHeader">
+                    <div class="info-title">
+                        <i class="fa fa-info-circle text-primary mr-2"></i>
+                        <span>视频信息</span>
+                    </div>
+                    <button id="toggleInfoBtn" class="text-gray-500 hover:text-primary transition-colors p-2 rounded-full hover:bg-gray-100 flex items-center justify-center w-8 h-8" data-tooltip="展开/收起详情">
+                        <i class="fa fa-chevron-down"></i>
+                    </button>
+                </div>
+                <div id="videoInfoContent" class="info-content"></div>
+            </div>
+            
+            <div class="video-container hidden">
+                <!-- 视频元素增加更大的圆角 -->
+                <!-- <video id="videoPreview" class="w-full aspect-video object-contain rounded-2xl" controls></video> -->
+                <video id="videoPreview" class="w-full rounded-2xl" controls></video>
+            </div>
+            <canvas id="frameCanvas" class="hidden absolute top-0 left-0"></canvas>
+            <canvas id="thumbnailCanvas" class="hidden"></canvas>
+        </div>
+
+        <!-- 时间轴和帧选择区域 -->
+        <div id="timelineContainer" class="hidden bg-white p-6 rounded-xl shadow-sm mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-semibold text-gray-800">选择帧</h3>
+                <div class="text-sm text-gray-500">
+                    <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
+                </div>
+            </div>
+            
+            <!-- 缩略图预览区 -->
+            <div class="relative mb-4 overflow-x-auto scrollbar-hide pb-2">
+                <div id="thumbnailsContainer" class="flex space-x-2 min-w-max px-1"></div>
+                <div class="absolute top-0 bottom-0 left-0 w-12 bg-gradient-to-r from-white to-transparent pointer-events-none z-10"></div>
+                <div class="absolute top-0 bottom-0 right-0 w-12 bg-gradient-to-l from-white to-transparent pointer-events-none z-10"></div>
+            </div>
+            
+            <!-- 进度条容器 -->
+            <div class="tooltip relative h-2 bg-gray-200 rounded-full cursor-pointer mb-6" id="progressContainer" data-tooltip="点击或拖动定位到指定时间点">
+                <div id="progressBar" class="absolute top-0 left-0 h-full bg-primary rounded-full"></div>
+                <div id="progressHandle" class="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-primary rounded-full shadow-md transform -translate-x-1/2 cursor-pointer"></div>
+            </div>
+            
+            <!-- 控制按钮区域 - 添加items-center确保垂直居中 -->
+            <div class="flex justify-center items-center space-x-2 md:space-x-4 flex-wrap">
+                <button id="prev1Sec" class="tooltip flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-full transition-all text-xs" data-tooltip="后退1秒">
+                    <i class="fa fa-backward"></i>
+                </button>
+                <button id="prev05Sec" class="tooltip flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-full transition-all text-xs" data-tooltip="后退0.5秒">
+                    <i class="fa fa-step-backward"></i>
+                </button>
+                <button id="prev5Frames" class="tooltip flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-full transition-all text-xs" data-tooltip="后退5帧">
+                    <i class="fa fa-fast-backward"></i> 
+                </button>
+                <button id="prevFrame" class="tooltip flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-full transition-all" data-tooltip="后退1帧">
+                    <i class="fa fa-step-backward"></i>
+                </button>
+                <button id="playPause" class="tooltip flex items-center justify-center bg-primary hover:bg-primary/90 text-white w-12 h-12 rounded-full transition-all shadow-md hover:shadow-lg" data-tooltip="播放/暂停视频（空格也可控制）">
+                    <i class="fa fa-play"></i>
+                </button>
+                <button id="nextFrame" class="tooltip flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-full transition-all" data-tooltip="前进1帧">
+                    <i class="fa fa-step-forward"></i>
+                </button>
+                <button id="next5Frames" class="tooltip flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-full transition-all text-xs" data-tooltip="前进5帧">
+                    <i class="fa fa-fast-forward"></i>
+                </button>
+                <button id="next05Sec" class="tooltip flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-full transition-all text-xs" data-tooltip="前进0.5秒">
+                    <i class="fa fa-step-forward"></i>
+                </button>
+                <button id="next1Sec" class="tooltip flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-full transition-all text-xs" data-tooltip="前进1秒">
+                    <i class="fa fa-forward"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 导出区域 - 修改默认值为JPG最高质量 -->
+        <div id="exportContainer" class="text-center hidden">
+            <div class="inline-flex items-center bg-white p-1 rounded-lg shadow-sm mb-4">
+                <select id="formatSelect" class="bg-transparent px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-lg" title="选择导出图片的格式">
+                    <option value="png">PNG 格式</option>
+                    <option value="jpeg" selected>JPEG 格式</option>
+                    <option value="webp">WebP 格式</option>
+                </select>
+                <select id="qualitySelect" class="bg-transparent px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-lg" title="选择图片质量（PNG格式无效果）">
+                    <option value="0.9" selected>高质量</option>
+                    <option value="0.7">中等质量</option>
+                    <option value="0.5">低质量</option>
+                </select>
+            </div>
+            <button id="exportButton" class="tooltip inline-flex items-center justify-center bg-secondary hover:bg-secondary/90 text-white font-medium py-3 px-8 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md" data-tooltip="导出当前帧为图片">
+                <i class="fa fa-download mr-2"></i>导出当前帧为图片
+            </button>
+            <p id="exportMessage" class="mt-4 text-sm text-gray-500 hidden"></p>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-gray-200 py-6 px-6">
+        <div class="container mx-auto text-center text-gray-500 text-sm">
+            <p>视频帧提取工具 &copy; 2023 - 所有处理均在本地完成，不会上传您的视频</p>
+        </div>
+    </footer>
+
+    <script>
+        // 获取DOM元素
+        const videoDropContainer = document.getElementById('videoDropContainer');
+        const dropPrompt = document.getElementById('dropPrompt');
+        const videoInfoCard = document.getElementById('videoInfoCard');
+        const videoContainer = document.querySelector('.video-container');
+        const fileInput = document.getElementById('fileInput');
+        const selectFileBtn = document.getElementById('selectFileBtn');
+        const timelineContainer = document.getElementById('timelineContainer');
+        const exportContainer = document.getElementById('exportContainer');
+        const videoPreview = document.getElementById('videoPreview');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressHandle = document.getElementById('progressHandle');
+        const currentTimeEl = document.getElementById('currentTime');
+        const totalTimeEl = document.getElementById('totalTime');
+        const playPauseBtn = document.getElementById('playPause');
+        const prevFrameBtn = document.getElementById('prevFrame');
+        const nextFrameBtn = document.getElementById('nextFrame');
+        const exportButton = document.getElementById('exportButton');
+        const exportMessage = document.getElementById('exportMessage');
+        const frameCanvas = document.getElementById('frameCanvas');
+        const thumbnailCanvas = document.getElementById('thumbnailCanvas');
+        const thumbnailsContainer = document.getElementById('thumbnailsContainer');
+        const formatSelect = document.getElementById('formatSelect');
+        const qualitySelect = document.getElementById('qualitySelect');
+        const prev5FramesBtn = document.getElementById('prev5Frames');
+        const next5FramesBtn = document.getElementById('next5Frames');
+        const videoInfoContent = document.getElementById('videoInfoContent');
+        const toggleInfoBtn = document.getElementById('toggleInfoBtn');
+        const infoHeader = document.getElementById('infoHeader');
+        const prev1SecBtn = document.getElementById('prev1Sec');
+        const next1SecBtn = document.getElementById('next1Sec');
+        const prev05SecBtn = document.getElementById('prev05Sec');
+        const next05SecBtn = document.getElementById('next05Sec');
+        
+        // 获取Canvas上下文
+        const ctx = frameCanvas.getContext('2d');
+        const thumbnailCtx = thumbnailCanvas.getContext('2d');
+
+        // 变量初始化
+        let isDragging = false;
+        let videoLoaded = false;
+        let frameRate = 30;
+        let videoURL = null;
+        let videoFile = null;
+        let thumbnails = [];
+        const THUMBNAIL_COUNT = 15;
+        const THUMBNAIL_WIDTH = 80;
+        let infoExpanded = false;
+        
+        // 文件选择状态管理
+        let isFileSelecting = false;
+        
+        // ========== 新增：加载用户保存的设置 ==========
+        function loadUserSettings() {
+            try {
+                const savedFormat = localStorage.getItem('exportFormat');
+                const savedQuality = localStorage.getItem('exportQuality');
+                
+                if (savedFormat) {
+                    formatSelect.value = savedFormat;
+                }
+                if (savedQuality) {
+                    qualitySelect.value = savedQuality;
+                }
+                
+                // 更新质量选择框的状态
+                updateQualitySelectState();
+            } catch (e) {
+                console.log('无法加载用户设置:', e);
+            }
+        }
+        
+        // ========== 新增：保存用户设置 ==========
+        function saveUserSettings() {
+            try {
+                localStorage.setItem('exportFormat', formatSelect.value);
+                localStorage.setItem('exportQuality', qualitySelect.value);
+            } catch (e) {
+                console.log('无法保存用户设置:', e);
+            }
+        }
+        
+        // ========== 新增：更新质量选择框状态 ==========
+        function updateQualitySelectState() {
+            const format = formatSelect.value;
+            qualitySelect.disabled = format === 'png';
+            if (format === 'png') {
+                qualitySelect.classList.add('opacity-50');
+            } else {
+                qualitySelect.classList.remove('opacity-50');
+            }
+        }
+        
+        // 页面加载时加载用户设置
+        document.addEventListener('DOMContentLoaded', loadUserSettings);
+        
+        // ========== 修改：修复空格键冲突 ==========
+        document.addEventListener('keydown', (e) => {
+            // 如果焦点在视频元素内，不处理空格键（让视频默认处理）
+            if (e.code === 'Space' && videoLoaded && 
+                document.activeElement !== videoPreview && 
+                !videoPreview.contains(document.activeElement)) {
+                e.preventDefault();
+                togglePlayPause();
+            }
+        });
+        
+        // 同步视频播放状态与按钮显示
+        videoPreview.addEventListener('play', () => {
+            playPauseBtn.innerHTML = '<i class="fa fa-pause"></i>';
+        });
+        
+        videoPreview.addEventListener('pause', () => {
+            playPauseBtn.innerHTML = '<i class="fa fa-play"></i>';
+        });
+
+        // 按钮点击事件
+        selectFileBtn.addEventListener('click', () => {
+            if (!isFileSelecting) {
+                isFileSelecting = true;
+                fileInput.click();
+            }
+        });
+        
+        // 文件选择事件处理
+        fileInput.addEventListener('change', function handleFileSelection(e) {
+            const files = e.target.files;
+            
+            // 重置选择状态
+            isFileSelecting = false;
+            
+            if (files.length > 0) {
+                handleFiles(files);
+                
+                // 延迟清空，避免影响当前选择
+                setTimeout(() => {
+                    fileInput.value = '';
+                }, 1000);
+            }
+        });
+        
+        // ========== 修改：监听格式和质量变化并保存设置 ==========
+        formatSelect.addEventListener('change', () => {
+            updateQualitySelectState();
+            saveUserSettings();
+        });
+        
+        qualitySelect.addEventListener('change', saveUserSettings);
+
+        // 拖放事件处理
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            videoDropContainer.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            videoDropContainer.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            videoDropContainer.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            videoDropContainer.classList.add('drag-over');
+        }
+
+        function unhighlight() {
+            videoDropContainer.classList.remove('drag-over');
+        }
+
+        // 处理文件拖放
+        videoDropContainer.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        // 文件处理函数
+        function handleFiles(files) {
+            if (!files.length) return;
+            
+            const file = files[0];
+            videoFile = file;
+            
+            if (!file.type.startsWith('video/')) {
+                showExportMessage('请选择视频文件', 'error');
+                return;
+            }
+
+            // 立即更新UI
+            dropPrompt.classList.add('hidden');
+            videoInfoCard.classList.remove('hidden');
+            videoContainer.classList.remove('hidden');
+            timelineContainer.classList.remove('hidden');
+            exportContainer.classList.remove('hidden');
+            
+            videoDropContainer.classList.remove('border-dashed');
+            videoDropContainer.classList.add('border-transparent');
+            
+            // 释放之前的视频URL
+            if (videoURL) {
+                URL.revokeObjectURL(videoURL);
+            }
+            
+            // 立即加载视频
+            videoURL = URL.createObjectURL(file);
+            videoPreview.src = videoURL;
+            
+            // 确保视频元数据加载
+            videoPreview.onloadedmetadata = function() {
+                initializeVideo();
+            };
+            
+            // 确保视频可以播放
+            videoPreview.oncanplay = function() {
+                videoLoaded = true;
+            };
+        }
+
+        function initializeVideo() {
+            // 设置canvas尺寸
+            frameCanvas.width = videoPreview.videoWidth;
+            frameCanvas.height = videoPreview.videoHeight;
+            
+            const aspectRatio = videoPreview.videoHeight / videoPreview.videoWidth;
+            thumbnailCanvas.width = THUMBNAIL_WIDTH;
+            thumbnailCanvas.height = THUMBNAIL_WIDTH * aspectRatio;
+            
+            frameRate = videoPreview.videoFrameRate || 30;
+            
+            updateTimeDisplay(videoPreview.duration, totalTimeEl);
+            
+            generateThumbnails();
+            generateVideoInfo();
+            
+            // 添加时间更新监听
+            videoPreview.addEventListener('timeupdate', updateProgress);
+        }
+
+        function generateVideoInfo() {
+            if (!videoFile) return;
+            
+            const fileSize = formatFileSize(videoFile.size);
+            const fileFormat = videoFile.type.split('/')[1] || '未知';
+            const duration = formatTime(videoPreview.duration);
+            const bitrate = estimateBitrate(videoFile.size, videoPreview.duration);
+            
+            // 构建信息内容（确保标题默认显示，内容默认隐藏）
+            videoInfoContent.innerHTML = `
+                <div class="info-item">
+                    <span class="info-label">文件名</span>
+                    <span class="info-value">${videoFile.name}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">格式</span>
+                    <span class="info-value">${fileFormat.toUpperCase()}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">分辨率</span>
+                    <span class="info-value">${videoPreview.videoWidth} × ${videoPreview.videoHeight}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">帧率</span>
+                    <span class="info-value">${frameRate.toFixed(2)} fps</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">时长</span>
+                    <span class="info-value">${duration}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">大小</span>
+                    <span class="info-value">${fileSize}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">平均码率(估算)</span>
+                    <span class="info-value">${bitrate}</span>
+                </div>
+            `;
+        }
+
+        // 切换视频信息展开/收起（确保标题始终显示）
+        function toggleInfo() {
+            infoExpanded = !infoExpanded;
+            videoInfoContent.classList.toggle('expanded', infoExpanded);
+            toggleInfoBtn.innerHTML = infoExpanded ? 
+                '<i class="fa fa-chevron-up"></i>' : 
+                '<i class="fa fa-chevron-down"></i>';
+        }
+
+        // 绑定信息切换事件
+        toggleInfoBtn.addEventListener('click', toggleInfo);
+        infoHeader.addEventListener('click', (e) => {
+            // 只有点击标题区域或按钮才触发切换，避免点击其他区域误触发
+            if (e.target === infoHeader || e.target.classList.contains('info-title') || 
+                e.target.tagName === 'I' || e.target.tagName === 'SPAN') {
+                toggleInfo();
+            }
+        });
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function estimateBitrate(bytes, durationSeconds) {
+            if (durationSeconds <= 0) return '0 bps';
+            
+            const bits = bytes * 8;
+            const kbits = bits / 1024;
+            const mbits = kbits / 1024;
+            
+            if (mbits >= 1) {
+                return `${(mbits / durationSeconds).toFixed(2)} Mbps`;
+            } else if (kbits >= 1) {
+                return `${(kbits / durationSeconds).toFixed(2)} Kbps`;
+            } else {
+                return `${(bits / durationSeconds).toFixed(2)} bps`;
+            }
+        }
+
+        async function generateThumbnails() {
+            thumbnailsContainer.innerHTML = '';
+            thumbnails = [];
+            
+            const duration = videoPreview.duration;
+            const interval = duration / (THUMBNAIL_COUNT - 1);
+            
+            for (let i = 0; i < THUMBNAIL_COUNT; i++) {
+                const time = i * interval;
+                await createThumbnail(time, i);
+            }
+        }
+
+        async function createThumbnail(time, index) {
+            return new Promise((resolve) => {
+                const currentTime = videoPreview.currentTime;
+                
+                videoPreview.currentTime = time;
+                
+                const onSeeked = () => {
+                    try {
+                        thumbnailCtx.drawImage(videoPreview, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
+                        
+                        const thumbnail = document.createElement('div');
+                        thumbnail.className = 'relative flex-shrink-0 w-20 cursor-pointer transition-all duration-200 rounded overflow-hidden shadow-sm tooltip';
+                        thumbnail.setAttribute('data-tooltip', `点击跳转到 ${formatTime(time)}`);
+                        
+                        const img = document.createElement('img');
+                        img.src = thumbnailCanvas.toDataURL('image/jpeg', 0.7);
+                        img.className = 'w-full h-auto object-cover';
+                        img.alt = `视频 ${formatTime(time)} 处的帧`;
+                        
+                        const timeLabel = document.createElement('div');
+                        timeLabel.className = 'absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-0.5 text-center';
+                        timeLabel.textContent = formatTime(time);
+                        
+                        thumbnail.appendChild(img);
+                        thumbnail.appendChild(timeLabel);
+                        thumbnailsContainer.appendChild(thumbnail);
+                        
+                        thumbnails.push({
+                            element: thumbnail,
+                            time: time,
+                            index: index
+                        });
+                        
+                        thumbnail.addEventListener('click', () => {
+                            videoPreview.currentTime = time;
+                            videoPreview.pause();
+                            playPauseBtn.innerHTML = '<i class="fa fa-play"></i>';
+                        });
+                        
+                        videoPreview.currentTime = currentTime;
+                        videoPreview.removeEventListener('seeked', onSeeked);
+                        
+                        resolve();
+                    } catch (error) {
+                        resolve();
+                    }
+                };
+                
+                videoPreview.addEventListener('seeked', onSeeked);
+            });
+        }
+
+        function updateThumbnailSelection(currentTime) {
+            if (thumbnails.length === 0) return;
+            
+            let closestIndex = 0;
+            let minDiff = Math.abs(thumbnails[0].time - currentTime);
+            
+            for (let i = 1; i < thumbnails.length; i++) {
+                const diff = Math.abs(thumbnails[i].time - currentTime);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIndex = i;
+                }
+            }
+            
+            thumbnails.forEach((thumb, index) => {
+                if (index === closestIndex) {
+                    thumb.element.classList.add('thumbnail-active');
+                } else {
+                    thumb.element.classList.remove('thumbnail-active');
+                }
+            });
+            
+            const activeThumb = thumbnails[closestIndex].element;
+            const container = thumbnailsContainer.parentElement;
+            const scrollPosition = activeThumb.offsetLeft - container.offsetWidth / 2 + activeThumb.offsetWidth / 2;
+            container.scrollTo({
+                left: scrollPosition,
+                behavior: 'smooth'
+            });
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateTimeDisplay(timeInSeconds, element) {
+            element.textContent = formatTime(timeInSeconds);
+        }
+
+        function updateProgress() {
+            if (!videoLoaded) return;
+            
+            const percent = (videoPreview.currentTime / videoPreview.duration) * 100;
+            progressBar.style.width = `${percent}%`;
+            progressHandle.style.left = `${percent}%`;
+            updateTimeDisplay(videoPreview.currentTime, currentTimeEl);
+            updateThumbnailSelection(videoPreview.currentTime);
+        }
+
+        progressContainer.addEventListener('click', scrub);
+        progressHandle.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchstart', startDrag, { passive: false });
+        document.addEventListener('touchmove', drag, { passive: false });
+        document.addEventListener('touchend', endDrag);
+
+        function scrub(e) {
+            if (!videoLoaded) return;
+            
+            const rect = progressContainer.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const scrubTime = (clickX / progressContainer.offsetWidth) * videoPreview.duration;
+            videoPreview.currentTime = scrubTime;
+        }
+
+        function startDrag(e) {
+            if (!videoLoaded) return;
+            isDragging = true;
+            progressBar.style.transition = 'none';
+            e.preventDefault();
+        }
+
+        function drag(e) {
+            if (!isDragging || !videoLoaded) return;
+            
+            let clientX;
+            if (e.type.includes('touch')) {
+                clientX = e.touches[0].clientX;
+            } else {
+                clientX = e.clientX;
+            }
+            
+            const rect = progressContainer.getBoundingClientRect();
+            let pos = (clientX - rect.left) / rect.width;
+            pos = Math.max(0, Math.min(pos, 1));
+            
+            const percent = pos * 100;
+            progressBar.style.width = `${percent}%`;
+            progressHandle.style.left = `${percent}%`;
+            
+            const newTime = pos * videoPreview.duration;
+            videoPreview.currentTime = newTime;
+            updateTimeDisplay(newTime, currentTimeEl);
+            updateThumbnailSelection(newTime);
+        }
+
+        function endDrag() {
+            if (!isDragging) return;
+            isDragging = false;
+            progressBar.style.transition = 'all duration-100';
+        }
+
+        // ========== 修改：播放暂停函数 ==========
+        playPauseBtn.addEventListener('click', togglePlayPause);
+
+        function togglePlayPause() {
+            if (!videoLoaded) return;
+            
+            if (videoPreview.paused) {
+                videoPreview.play();
+            } else {
+                videoPreview.pause();
+            }
+            // 不再手动更新按钮，而是通过事件监听同步
+        }
+
+        prevFrameBtn.addEventListener('click', goToPrevFrame);
+        nextFrameBtn.addEventListener('click', goToNextFrame);
+
+        function goToPrevFrame() {
+            if (!videoLoaded) return;
+            videoPreview.pause();
+            videoPreview.currentTime = Math.max(0, videoPreview.currentTime - (1 / frameRate));
+        }
+
+        function goToNextFrame() {
+            if (!videoLoaded) return;
+            videoPreview.pause();
+            videoPreview.currentTime = Math.min(videoPreview.duration, videoPreview.currentTime + (1 / frameRate));
+        }
+
+        prev5FramesBtn.addEventListener('click', goToPrev5Frames);
+        next5FramesBtn.addEventListener('click', goToNext5Frames);
+
+        function goToPrev5Frames() {
+            if (!videoLoaded) return;
+            videoPreview.pause();
+            const targetTime = Math.max(0, videoPreview.currentTime - (5 / frameRate));
+            videoPreview.currentTime = targetTime;
+        }
+
+        function goToNext5Frames() {
+            if (!videoLoaded) return;
+            videoPreview.pause();
+            const targetTime = Math.min(videoPreview.duration, videoPreview.currentTime + (5 / frameRate));
+            videoPreview.currentTime = targetTime;
+        }
+
+        prev05SecBtn.addEventListener('click', goToPrev05Sec);
+        next05SecBtn.addEventListener('click', goToNext05Sec);
+        prev1SecBtn.addEventListener('click', goToPrev1Sec);
+        next1SecBtn.addEventListener('click', goToNext1Sec);
+
+        function goToPrev05Sec() {
+            if (!videoLoaded) return;
+            videoPreview.pause();
+            const targetTime = Math.max(0, videoPreview.currentTime - 0.5);
+            videoPreview.currentTime = targetTime;
+        }
+
+        function goToNext05Sec() {
+            if (!videoLoaded) return;
+            videoPreview.pause();
+            const targetTime = Math.min(videoPreview.duration, videoPreview.currentTime + 0.5);
+            videoPreview.currentTime = targetTime;
+        }
+
+        function goToPrev1Sec() {
+            if (!videoLoaded) return;
+            videoPreview.pause();
+            const targetTime = Math.max(0, videoPreview.currentTime - 1);
+            videoPreview.currentTime = targetTime;
+        }
+
+        function goToNext1Sec() {
+            if (!videoLoaded) return;
+            videoPreview.pause();
+            const targetTime = Math.min(videoPreview.duration, videoPreview.currentTime + 1);
+            videoPreview.currentTime = targetTime;
+        }
+
+        exportButton.addEventListener('click', exportCurrentFrame);
+
+        function exportCurrentFrame() {
+            if (!videoLoaded) return;
+            
+            const format = formatSelect.value;
+            const quality = parseFloat(qualitySelect.value);
+            
+            ctx.drawImage(videoPreview, 0, 0, frameCanvas.width, frameCanvas.height);
+            
+            let mimeType;
+            switch(format) {
+                case 'jpeg': mimeType = 'image/jpeg'; break;
+                case 'webp': mimeType = 'image/webp'; break;
+                default: mimeType = 'image/png';
+            }
+            
+            const dataURL = frameCanvas.toDataURL(mimeType, format !== 'png' ? quality : undefined);
+            const link = document.createElement('a');
+            link.download = `frame-${formatTime(videoPreview.currentTime).replace(':', '-')}.${format}`;
+            link.href = dataURL;
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showExportMessage(`图片已成功导出为 ${format.toUpperCase()} 格式！`, 'success');
+        }
+
+        function showExportMessage(text, type = 'success') {
+            exportMessage.textContent = text;
+            exportMessage.classList.remove('hidden', 'text-green-500', 'text-red-500');
+            
+            if (type === 'success') {
+                exportMessage.classList.add('text-green-500');
+            } else {
+                exportMessage.classList.add('text-red-500');
+            }
+            
+            setTimeout(() => {
+                exportMessage.classList.add('hidden');
+            }, 3000);
+        }
+
+        videoPreview.addEventListener('ended', () => {
+            playPauseBtn.innerHTML = '<i class="fa fa-play"></i>';
+        });
+        
+        window.addEventListener('resize', () => {
+            if (videoLoaded) {
+                frameCanvas.width = videoPreview.videoWidth;
+                frameCanvas.height = videoPreview.videoHeight;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修复版图片元数据查看器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 引入Exif解析库 -->
+    <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+    <!-- 引入Leaflet地图库 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        neutral: '#1F2937',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .metadata-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            }
+            .shadow-soft {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            }
+            #map {
+                width: 100%;
+                height: 100%;
+                border-radius: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 text-neutral min-h-screen">
+    <header class="bg-white shadow-sm py-6">
+        <div class="container mx-auto px-4 md:px-6">
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-neutral flex items-center">
+                <i class="fa fa-camera-retro text-primary mr-3"></i>
+                修复版图片元数据查看器
+            </h1>
+            <p class="text-gray-500 mt-1">本地解析图片元数据（相机参数/地理位置等），数据不上传服务器</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 md:px-6 py-8">
+        <!-- 上传区域 -->
+        <section class="mb-10">
+            <div class="bg-white rounded-xl shadow-soft p-6 md:p-8 transition-all duration-300 hover:shadow-lg">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fa fa-upload text-primary mr-2"></i>上传图片
+                </h2>
+                
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-colors duration-300 hover:border-primary" id="dropArea">
+                    <i class="fa fa-picture-o text-5xl text-gray-400 mb-4"></i>
+                    <p class="mb-4 text-gray-600">拖放图片到此处，或点击选择图片</p>
+                    <label class="inline-block bg-primary hover:bg-primary/90 text-white font-medium py-2 px-6 rounded-lg cursor-pointer transition-all duration-300 transform hover:scale-105">
+                        <i class="fa fa-file-image-o mr-2"></i>选择图片
+                        <input type="file" id="fileInput" accept="image/*" class="hidden">
+                    </label>
+                    <p class="mt-4 text-sm text-gray-500">支持 JPG、PNG、TIFF、WebP 等主流图片格式（优先JPG，含元数据更完整）</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 图片预览区域 -->
+        <section id="previewSection" class="mb-10 hidden">
+            <div class="bg-white rounded-xl shadow-soft p-6 md:p-8">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fa fa-eye text-primary mr-2"></i>图片预览 & 基础信息
+                </h2>
+                <div class="flex flex-col md:flex-row gap-6">
+                    <!-- 图片预览 -->
+                    <div class="md:w-1/2">
+                        <div class="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center p-4 min-h-[300px]">
+                            <img id="previewImage" src="" alt="图片预览" class="max-w-full max-h-[500px] object-contain">
+                        </div>
+                        <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <span class="text-gray-500">文件大小：</span>
+                                <span id="fileSize" class="font-medium">-</span>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <span class="text-gray-500">文件格式：</span>
+                                <span id="fileFormat" class="font-medium">-</span>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <span class="text-gray-500">图片尺寸：</span>
+                                <span id="imageDimension" class="font-medium">-</span>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <span class="text-gray-500">修改时间：</span>
+                                <span id="fileModifyTime" class="font-medium">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 地理位置预览 -->
+                    <div class="md:w-1/2">
+                        <div id="locationContainer" class="hidden">
+                            <h3 class="font-medium text-lg mb-3 flex items-center">
+                                <i class="fa fa-map-marker text-red-500 mr-2"></i>拍摄地理位置
+                            </h3>
+                            <!-- 地图容器 -->
+                            <div class="bg-gray-100 rounded-lg p-2 h-[250px] mb-4 relative">
+                                <div id="map" class="w-full h-full rounded"></div>
+                                <div id="mapLoading" class="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg hidden">
+                                    <i class="fa fa-spinner fa-spin text-primary mr-2"></i>
+                                    <span>加载地图中...</span>
+                                </div>
+                            </div>
+                            <!-- 地理位置详情 -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <span class="text-gray-500">纬度：</span>
+                                    <span id="latitude" class="font-medium">-</span>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <span class="text-gray-500">经度：</span>
+                                    <span id="longitude" class="font-medium">-</span>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded-lg md:col-span-2">
+                                    <span class="text-gray-500">坐标链接：</span>
+                                    <a id="coordLink" href="" target="_blank" class="text-primary hover:underline" rel="noopener noreferrer">-</a>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 无GPS数据提示 -->
+                        <div id="noLocationContainer" class="hidden h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                            <div class="text-center text-gray-500">
+                                <i class="fa fa-map-o text-4xl mb-2"></i>
+                                <p>该图片未包含GPS地理位置信息</p>
+                                <p class="text-xs mt-1">（通常手机拍摄时需开启"位置信息"权限）</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 元数据详情区域 -->
+        <section id="metadataSection" class="mb-10 hidden">
+            <div class="bg-white rounded-xl shadow-soft p-6 md:p-8">
+                <h2 class="text-xl font-semibold mb-6 flex items-center">
+                    <i class="fa fa-list-alt text-primary mr-2"></i>图片元数据详情
+                </h2>
+                
+                <!-- 核心元数据卡片 -->
+                <div class="grid metadata-grid gap-4 mb-8">
+                    <!-- 相机信息 -->
+                    <div class="metadata-item p-4 border border-gray-100 rounded-lg hover:border-primary/50 transition-colors duration-200">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                            <i class="fa fa-camera mr-1"></i>相机制造商
+                        </h3>
+                        <p class="text-gray-800" id="cameraMakeValue">-</p>
+                    </div>
+                    
+                    <div class="metadata-item p-4 border border-gray-100 rounded-lg hover:border-primary/50 transition-colors duration-200">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                            <i class="fa fa-mobile mr-1"></i>相机/设备型号
+                        </h3>
+                        <p class="text-gray-800" id="cameraModelValue">-</p>
+                    </div>
+                    
+                    <!-- 拍摄参数 -->
+                    <div class="metadata-item p-4 border border-gray-100 rounded-lg hover:border-primary/50 transition-colors duration-200">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                            <i class="fa fa-clock-o mr-1"></i>拍摄日期时间
+                        </h3>
+                        <p class="text-gray-800" id="dateTakenValue">-</p>
+                    </div>
+                    
+                    <div class="metadata-item p-4 border border-gray-100 rounded-lg hover:border-primary/50 transition-colors duration-200">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                            <i class="fa fa-search mr-1"></i>焦距
+                        </h3>
+                        <p class="text-gray-800" id="focalLengthValue">-</p>
+                    </div>
+                    
+                    <div class="metadata-item p-4 border border-gray-100 rounded-lg hover:border-primary/50 transition-colors duration-200">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                            <i class="fa fa-circle-o mr-1"></i>光圈
+                        </h3>
+                        <p class="text-gray-800" id="apertureValue">-</p>
+                    </div>
+                    
+                    <div class="metadata-item p-4 border border-gray-100 rounded-lg hover:border-primary/50 transition-colors duration-200">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                            <i class="fa fa-tachometer mr-1"></i>快门速度
+                        </h3>
+                        <p class="text-gray-800" id="shutterSpeedValue">-</p>
+                    </div>
+                    
+                    <div class="metadata-item p-4 border border-gray-100 rounded-lg hover:border-primary/50 transition-colors duration-200">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                            <i class="fa fa-sun-o mr-1"></i>ISO感光度
+                        </h3>
+                        <p class="text-gray-800" id="isoValue">-</p>
+                    </div>
+                    
+                    <!-- 图片信息 -->
+                    <div class="metadata-item p-4 border border-gray-100 rounded-lg hover:border-primary/50 transition-colors duration-200">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                            <i class="fa fa-paint-brush mr-1"></i>色彩空间
+                        </h3>
+                        <p class="text-gray-800" id="colorSpaceValue">-</p>
+                    </div>
+                    
+                    <div class="metadata-item p-4 border border-gray-100 rounded-lg hover:border-primary/50 transition-colors duration-200">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                            <i class="fa fa-compress mr-1"></i>压缩方式
+                        </h3>
+                        <p class="text-gray-800" id="compressionValue">-</p>
+                    </div>
+                    
+                    <div class="metadata-item p-4 border border-gray-100 rounded-lg hover:border-primary/50 transition-colors duration-200">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                            <i class="fa fa-code mr-1"></i>处理软件
+                        </h3>
+                        <p class="text-gray-800" id="softwareValue">-</p>
+                    </div>
+                </div>
+                
+                <!-- 完整元数据展开区域 -->
+                <div class="border-t border-gray-100 pt-6">
+                    <button id="showAllMetadata" class="text-primary hover:text-primary/80 font-medium flex items-center transition-colors duration-200">
+                        <span>查看完整元数据（JSON格式）</span>
+                        <i class="fa fa-chevron-down ml-1 transition-transform duration-300" id="toggleIcon"></i>
+                    </button>
+                    
+                    <div id="allMetadata" class="hidden mt-4 p-4 bg-gray-50 rounded-lg text-sm">
+                        <div class="flex justify-between items-center mb-2">
+                            <p class="text-gray-500">提示：以下为原始解析数据，部分字段为专业参数</p>
+                            <button id="copyMetadata" class="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded flex items-center">
+                                <i class="fa fa-copy mr-1"></i>复制
+                            </button>
+                        </div>
+                        <pre id="fullMetadata" class="text-gray-700 overflow-x-auto max-h-[500px] whitespace-pre-wrap"></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 错误提示区域 -->
+        <section id="errorSection" class="mb-10 hidden">
+            <div class="bg-red-50 border border-red-100 rounded-xl p-6">
+                <div class="flex items-start">
+                    <i class="fa fa-exclamation-circle text-red-500 text-xl mt-0.5"></i>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-medium text-red-800">操作出错</h3>
+                        <p class="mt-1 text-red-700" id="errorMessage"></p>
+                        <p class="mt-2 text-sm text-red-600">建议：1. 确认图片格式正确 2. 尝试其他图片（如手机拍摄的JPG）3. 刷新页面重试</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 无元数据提示区域 -->
+        <section id="noMetadataSection" class="mb-10 hidden">
+            <div class="bg-yellow-50 border border-yellow-100 rounded-xl p-6">
+                <div class="flex items-start">
+                    <i class="fa fa-info-circle text-yellow-500 text-xl mt-0.5"></i>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-medium text-yellow-800">未检测到有效元数据</h3>
+                        <p class="mt-1 text-yellow-700">
+                            该图片未包含可识别的Exif/IPTC/XMP元数据，可能原因如下：
+                        </p>
+                        <ul class="list-disc ml-5 mt-2 text-yellow-700 space-y-1">
+                            <li>图片为截图（如系统截图、聊天截图），通常不含相机元数据</li>
+                            <li>图片经过压缩工具处理（如在线压缩、PS导出时移除元数据）</li>
+                            <li>图片格式不支持元数据（如部分PNG、SVG图片）</li>
+                            <li>元数据被主动删除（如隐私保护工具清理）</li>
+                        </ul>
+                        <p class="mt-3 text-yellow-700">建议：尝试上传手机拍摄的原始JPG图片（需开启相机"保存位置信息"权限）</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-white border-t border-gray-200 py-6 mt-auto">
+        <div class="container mx-auto px-4 md:px-6 text-center text-gray-500 text-sm">
+            <p>图片元数据查看器 | 所有解析均在本地浏览器完成，图片和数据不会上传至服务器</p>
+            <p class="mt-1">依赖库：exifr（元数据解析）、Leaflet（地图可视化）、Tailwind CSS（样式）</p>
+        </div>
+    </footer>
+
+    <script>
+        // DOM元素缓存
+        const dom = {
+            dropArea: document.getElementById('dropArea'),
+            fileInput: document.getElementById('fileInput'),
+            previewSection: document.getElementById('previewSection'),
+            previewImage: document.getElementById('previewImage'),
+            metadataSection: document.getElementById('metadataSection'),
+            errorSection: document.getElementById('errorSection'),
+            noMetadataSection: document.getElementById('noMetadataSection'),
+            errorMessage: document.getElementById('errorMessage'),
+            showAllMetadata: document.getElementById('showAllMetadata'),
+            allMetadata: document.getElementById('allMetadata'),
+            toggleIcon: document.getElementById('toggleIcon'),
+            fullMetadata: document.getElementById('fullMetadata'),
+            copyMetadata: document.getElementById('copyMetadata'),
+            // 基础信息元素
+            fileSize: document.getElementById('fileSize'),
+            fileFormat: document.getElementById('fileFormat'),
+            imageDimension: document.getElementById('imageDimension'),
+            fileModifyTime: document.getElementById('fileModifyTime'),
+            // 地理位置元素
+            locationContainer: document.getElementById('locationContainer'),
+            noLocationContainer: document.getElementById('noLocationContainer'),
+            latitude: document.getElementById('latitude'),
+            longitude: document.getElementById('longitude'),
+            coordLink: document.getElementById('coordLink'),
+            map: document.getElementById('map'),
+            mapLoading: document.getElementById('mapLoading'),
+            // 元数据详情元素
+            cameraMakeValue: document.getElementById('cameraMakeValue'),
+            cameraModelValue: document.getElementById('cameraModelValue'),
+            dateTakenValue: document.getElementById('dateTakenValue'),
+            focalLengthValue: document.getElementById('focalLengthValue'),
+            apertureValue: document.getElementById('apertureValue'),
+            shutterSpeedValue: document.getElementById('shutterSpeedValue'),
+            isoValue: document.getElementById('isoValue'),
+            colorSpaceValue: document.getElementById('colorSpaceValue'),
+            compressionValue: document.getElementById('compressionValue'),
+            softwareValue: document.getElementById('softwareValue')
+        };
+
+        // 全局变量（地图实例）
+        let mapInstance = null;
+
+        // 初始化事件监听
+        function initEventListeners() {
+            // 1. 文件选择事件
+            dom.fileInput.addEventListener('change', handleFileSelect);
+
+            // 2. 拖放事件
+            dom.dropArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dom.dropArea.classList.add('border-primary', 'bg-blue-50');
+            });
+            dom.dropArea.addEventListener('dragleave', () => {
+                dom.dropArea.classList.remove('border-primary', 'bg-blue-50');
+            });
+            dom.dropArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dom.dropArea.classList.remove('border-primary', 'bg-blue-50');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    const file = e.dataTransfer.files[0];
+                    if (file.type.startsWith('image/')) {
+                        processImageFile(file);
+                    } else {
+                        showError('请上传图片文件（支持JPG/PNG/TIFF等）');
+                    }
+                }
+            });
+
+            // 3. 点击上传区域触发文件选择
+            dom.dropArea.addEventListener('click', (e) => {
+                if (!e.target.closest('label')) {
+                    dom.fileInput.click();
+                }
+            });
+
+            // 4. 显示/隐藏完整元数据
+            dom.showAllMetadata.addEventListener('click', () => {
+                dom.allMetadata.classList.toggle('hidden');
+                dom.toggleIcon.classList.toggle('rotate-180');
+            });
+
+            // 5. 复制完整元数据
+            dom.copyMetadata.addEventListener('click', () => {
+                const metadataText = dom.fullMetadata.textContent;
+                navigator.clipboard.writeText(metadataText).then(() => {
+                    const originalText = dom.copyMetadata.innerHTML;
+                    dom.copyMetadata.innerHTML = '<i class="fa fa-check mr-1"></i>已复制';
+                    dom.copyMetadata.classList.remove('bg-gray-200', 'hover:bg-gray-300');
+                    dom.copyMetadata.classList.add('bg-green-100', 'text-green-700');
+                    setTimeout(() => {
+                        dom.copyMetadata.innerHTML = originalText;
+                        dom.copyMetadata.classList.remove('bg-green-100', 'text-green-700');
+                        dom.copyMetadata.classList.add('bg-gray-200', 'hover:bg-gray-300');
+                    }, 2000);
+                }).catch(() => {
+                    showError('复制元数据失败，请手动复制');
+                });
+            });
+        }
+
+        // 处理文件选择
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processImageFile(file);
+                // 重置文件输入
+                e.target.value = '';
+            }
+        }
+
+        // 处理图片文件
+        async function processImageFile(file) {
+            try {
+                // 显示基础文件信息
+                showBasicFileInfo(file);
+
+                // 显示图片预览
+                const previewUrl = await getImagePreviewUrl(file);
+                dom.previewImage.src = previewUrl;
+                dom.previewSection.classList.remove('hidden');
+
+                // 隐藏所有提示区域
+                dom.errorSection.classList.add('hidden');
+                dom.noMetadataSection.classList.add('hidden');
+                dom.metadataSection.classList.add('hidden');
+                dom.locationContainer.classList.add('hidden');
+                dom.noLocationContainer.classList.add('hidden');
+
+                // 解析元数据 - 新增：强制解析所有可能的字段
+                const metadata = await parseImageMetadata(file);
+                
+                // 处理解析结果
+                if (metadata && Object.keys(metadata).length > 0) {
+                    // 有元数据：显示详情 + 处理地理位置
+                    displayMetadata(metadata);
+                    handleGeolocation(metadata);
+                    dom.metadataSection.classList.remove('hidden');
+                    // 显示完整元数据
+                    dom.fullMetadata.textContent = JSON.stringify(metadata, null, 2);
+                } else {
+                    // 无元数据：显示提示
+                    dom.noMetadataSection.classList.remove('hidden');
+                }
+
+            } catch (error) {
+                console.error('处理图片失败:', error);
+                showError(`处理图片时出错：${error.message || '未知错误'}`);
+            }
+        }
+
+        // 获取图片预览URL
+        function getImagePreviewUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(new Error(`预览图片失败：${e.target.error.message}`));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 显示基础文件信息
+        function showBasicFileInfo(file) {
+            // 文件大小
+            const fileSizeBytes = file.size;
+            let fileSizeText;
+            if (fileSizeBytes < 1024 * 1024) {
+                fileSizeText = `${(fileSizeBytes / 1024).toFixed(1)} KB`;
+            } else {
+                fileSizeText = `${(fileSizeBytes / (1024 * 1024)).toFixed(2)} MB`;
+            }
+            dom.fileSize.textContent = fileSizeText;
+
+            // 文件格式
+            const mimeType = file.type;
+            const fileFormat = mimeType.split('/')[1] || '未知';
+            dom.fileFormat.textContent = fileFormat.toUpperCase();
+
+            // 文件修改时间
+            const modifyTime = new Date(file.lastModified);
+            dom.fileModifyTime.textContent = modifyTime.toLocaleString();
+
+            // 图片尺寸
+            const img = new Image();
+            img.onload = function() {
+                dom.imageDimension.textContent = `${this.width} × ${this.height} 像素`;
+                URL.revokeObjectURL(this.src);
+            };
+            img.src = URL.createObjectURL(file);
+        }
+
+        // 解析图片元数据 - 优化：增加更多解析选项
+        async function parseImageMetadata(file) {
+            try {
+                // 增强解析配置：强制解析所有可能的元数据字段
+                const metadata = await exifr.parse(file, {
+                    gps: true,
+                    xmp: true,
+                    ifd0: true,
+                    ifd1: true,
+                    exif: true,
+                    iptc: true,
+                    icc: true,
+                    thumbnail: false,
+                    tiff: true,
+                    jfif: true,
+                    // 新增：解析厂商自定义字段
+                    makerNote: true,
+                    // 增加超时时间
+                    timeout: 10000
+                });
+
+                // 过滤空值
+                if (!metadata) return {};
+                const filteredMetadata = {};
+                for (const [key, value] of Object.entries(metadata)) {
+                    if (value !== undefined && value !== null && value !== '') {
+                        filteredMetadata[key] = value;
+                    }
+                }
+                return filteredMetadata;
+            } catch (error) {
+                if (error.message.includes('no metadata') || error.message.includes('not found')) {
+                    return {};
+                } else {
+                    throw new Error(`元数据解析失败：${error.message}`);
+                }
+            }
+        }
+
+        // 显示元数据详情 - 核心优化：增加多字段映射
+        function displayMetadata(metadata) {
+            // 相机制造商 - 支持多个可能的字段名
+            const make = metadata.Make || metadata.make || metadata.Manufacturer || '未知';
+            dom.cameraMakeValue.textContent = make;
+
+            // 相机/设备型号 - 支持多个可能的字段名
+            const model = metadata.Model || metadata.model || metadata.DeviceModel || '未知';
+            dom.cameraModelValue.textContent = model;
+
+            // 拍摄时间 - 支持更多时间字段
+            const dateTaken = metadata.DateTimeOriginal || metadata.CreateDate || 
+                             metadata.ModifyDate || metadata.dateTime || 
+                             metadata.fileModifyDate;
+            dom.dateTakenValue.textContent = dateTaken ? new Date(dateTaken).toLocaleString() : '未知';
+
+            // 焦距 - 支持多个可能的字段名
+            const focalLength = metadata.FocalLength || metadata.focalLength || 
+                               metadata.FocalLengthIn35mmFormat;
+            dom.focalLengthValue.textContent = focalLength 
+                ? `${focalLength} mm` 
+                : '未知';
+
+            // 光圈 - 支持多个可能的字段名
+            const aperture = metadata.FNumber || metadata.fNumber || 
+                            metadata.ApertureValue || metadata.aperture;
+            dom.apertureValue.textContent = aperture 
+                ? `f/${aperture}` 
+                : '未知';
+
+            // 快门速度 - 支持多个可能的字段名
+            const shutterSpeed = metadata.ExposureTime || metadata.exposureTime || 
+                               metadata.ShutterSpeedValue;
+            dom.shutterSpeedValue.textContent = shutterSpeed 
+                ? shutterSpeed < 1 
+                    ? `1/${Math.round(1 / shutterSpeed)} s` 
+                    : `${shutterSpeed} s`
+                : '未知';
+
+            // ISO感光度 - 支持多个可能的字段名
+            const iso = metadata.ISO || metadata.IsoSpeedRatings || '未知';
+            dom.isoValue.textContent = iso;
+
+            // 色彩空间 - 支持更多可能的值
+            const colorSpace = metadata.ColorSpace || metadata.colorSpace;
+            let colorSpaceText = '未知';
+            if (colorSpace !== undefined) {
+                switch(colorSpace) {
+                    case 1: colorSpaceText = 'sRGB'; break;
+                    case 2: colorSpaceText = 'Adobe RGB'; break;
+                    case 65535: colorSpaceText = '未校准'; break;
+                    default: colorSpaceText = colorSpace.toString();
+                }
+            }
+            dom.colorSpaceValue.textContent = colorSpaceText;
+
+            // 压缩方式 - 支持多个可能的字段名
+            const compression = metadata.Compression || metadata.compression;
+            let compressionText = '未知';
+            if (compression !== undefined) {
+                switch(compression) {
+                    case 1: compressionText = '未压缩'; break;
+                    case 6: compressionText = 'JPEG压缩'; break;
+                    default: compressionText = `压缩编码: ${compression}`;
+                }
+            }
+            dom.compressionValue.textContent = compressionText;
+
+            // 处理软件 - 支持多个可能的字段名
+            const software = metadata.Software || metadata.software || 
+                           metadata.ProcessSoftware || '未知';
+            dom.softwareValue.textContent = software;
+        }
+
+        // 处理地理位置信息
+        function handleGeolocation(metadata) {
+            // 检查是否有有效GPS坐标
+            const hasGps = metadata.latitude !== undefined && metadata.longitude !== undefined 
+                && !isNaN(metadata.latitude) && !isNaN(metadata.longitude);
+
+            if (hasGps) {
+                const lat = metadata.latitude;
+                const lng = metadata.longitude;
+
+                // 显示坐标信息
+                dom.latitude.textContent = `${lat.toFixed(6)}° ${lat >= 0 ? 'N' : 'S'}`;
+                dom.longitude.textContent = `${lng.toFixed(6)}° ${lng >= 0 ? 'E' : 'W'}`;
+                // 生成谷歌地图链接
+                const mapUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                dom.coordLink.href = mapUrl;
+                dom.coordLink.textContent = `在谷歌地图中查看 (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+
+                // 显示地图容器
+                dom.locationContainer.classList.remove('hidden');
+                dom.noLocationContainer.classList.add('hidden');
+
+                // 加载地图
+                renderMap(lat, lng);
+            } else {
+                // 无GPS数据
+                dom.locationContainer.classList.add('hidden');
+                dom.noLocationContainer.classList.remove('hidden');
+            }
+        }
+
+        // 渲染地图
+        function renderMap(lat, lng) {
+            // 显示加载状态
+            dom.mapLoading.classList.remove('hidden');
+
+            try {
+                // 销毁已有地图实例
+                if (mapInstance) {
+                    mapInstance.remove();
+                }
+
+                // 创建新地图实例
+                mapInstance = L.map(dom.map, {
+                    zoomControl: true,
+                    attributionControl: true
+                }).setView([lat, lng], 15);
+
+                // 加载地图瓦片
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    maxZoom: 19
+                }).addTo(mapInstance);
+
+                // 添加标记
+                L.marker([lat, lng])
+                    .addTo(mapInstance)
+                    .bindPopup(`拍摄位置<br>(${lat.toFixed(6)}, ${lng.toFixed(6)})`)
+                    .openPopup();
+
+                // 隐藏加载状态
+                dom.mapLoading.classList.add('hidden');
+
+            } catch (error) {
+                dom.mapLoading.innerHTML = '<i class="fa fa-exclamation-triangle text-yellow-500 mr-2"></i>地图加载失败';
+                console.error('地图渲染失败:', error);
+            }
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            dom.errorMessage.textContent = message;
+            dom.errorSection.classList.remove('hidden');
+            dom.previewSection.classList.remove('hidden');
+            dom.metadataSection.classList.add('hidden');
+            dom.noMetadataSection.classList.add('hidden');
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', initEventListeners);
+    </script>
+</body>
+</html>

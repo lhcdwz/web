@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>进制转换器 | 数字基数转换工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet"> -->
+    
+    <!-- 配置Tailwind自定义主题 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#8B5CF6',
+                        dark: '#1E293B',
+                        light: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'custom': '0 10px 25px -5px rgba(59, 130, 246, 0.1), 0 8px 10px -6px rgba(59, 130, 246, 0.1)',
+                        'input': '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                    }
+                },
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .transition-all-300 {
+                transition: all 300ms ease-in-out;
+            }
+            .gradient-bg {
+                background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+            }
+            .card-hover {
+                @apply hover:shadow-lg hover:-translate-y-1 transition-all duration-300;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 text-dark min-h-screen flex flex-col">
+    <!-- 顶部导航栏 -->
+    <header class="gradient-bg text-white shadow-md">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fa fa-exchange text-2xl" aria-hidden="true"></i>
+                    <h1 class="text-[clamp(1.5rem,3vw,2rem)] font-bold">进制转换器</h1>
+                </div>
+                <div class="hidden md:flex items-center space-x-6">
+                    <a href="#" class="hover:text-gray-200 transition-all-300 flex items-center">
+                        <i class="fa fa-question-circle mr-1" aria-hidden="true"></i>
+                        <span>帮助</span>
+                    </a>
+                    <a href="#" class="hover:text-gray-200 transition-all-300 flex items-center">
+                        <i class="fa fa-info-circle mr-1" aria-hidden="true"></i>
+                        <span>关于</span>
+                    </a>
+                </div>
+                <button class="md:hidden text-white text-xl">
+                    <i class="fa fa-bars" aria-hidden="true"></i>
+                </button>
+            </div>
+            <p class="mt-2 text-blue-100 max-w-xl">轻松在二进制、八进制、十进制和十六进制之间进行转换，支持整数和小数转换</p>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <!-- 转换说明卡片 -->
+            <div class="bg-white rounded-lg shadow-custom p-6 mb-8">
+                <h2 class="text-xl font-semibold mb-3 flex items-center">
+                    <i class="fa fa-lightbulb-o text-yellow-500 mr-2" aria-hidden="true"></i>
+                    如何使用
+                </h2>
+                <p class="text-gray-600 mb-4">在任意进制输入框中输入数值，其他进制将自动计算并显示结果。停止输入2秒后会记录转换历史。支持整数和小数转换，十六进制字母不区分大小写。</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                    <div class="flex items-start">
+                        <i class="fa fa-check-circle text-green-500 mt-1 mr-2" aria-hidden="true"></i>
+                        <div>二进制：仅包含数字 0 和 1</div>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fa fa-check-circle text-green-500 mt-1 mr-2" aria-hidden="true"></i>
+                        <div>八进制：包含数字 0-7</div>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fa fa-check-circle text-green-500 mt-1 mr-2" aria-hidden="true"></i>
+                        <div>十进制：包含数字 0-9 和小数点</div>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fa fa-check-circle text-green-500 mt-1 mr-2" aria-hidden="true"></i>
+                        <div>十六进制：包含数字 0-9 和字母 A-F（不区分大小写）</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 转换区域 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- 二进制输入 -->
+                <div class="bg-white rounded-lg shadow-custom p-5 card-hover">
+                    <label for="binary" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <i class="fa fa-code text-primary mr-2" aria-hidden="true"></i>
+                        二进制 (Base 2)
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="binary" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary shadow-input outline-none transition-all-300"
+                            placeholder="输入二进制数字 (0-1)"
+                            data-base="2"
+                        >
+                        <button class="copy-btn absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary transition-all-300" data-target="binary">
+                            <i class="fa fa-copy" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 八进制输入 -->
+                <div class="bg-white rounded-lg shadow-custom p-5 card-hover">
+                    <label for="octal" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <i class="fa fa-cube text-primary mr-2" aria-hidden="true"></i>
+                        八进制 (Base 8)
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="octal" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary shadow-input outline-none transition-all-300"
+                            placeholder="输入八进制数字 (0-7)"
+                            data-base="8"
+                        >
+                        <button class="copy-btn absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary transition-all-300" data-target="octal">
+                            <i class="fa fa-copy" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 十进制输入 -->
+                <div class="bg-white rounded-lg shadow-custom p-5 card-hover">
+                    <label for="decimal" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <i class="fa fa-hashtag text-primary mr-2" aria-hidden="true"></i>
+                        十进制 (Base 10)
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="decimal" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary shadow-input outline-none transition-all-300"
+                            placeholder="输入十进制数字 (0-9)"
+                            data-base="10"
+                        >
+                        <button class="copy-btn absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary transition-all-300" data-target="decimal">
+                            <i class="fa fa-copy" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 十六进制输入 -->
+                <div class="bg-white rounded-lg shadow-custom p-5 card-hover">
+                    <label for="hexadecimal" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <i class="fa fa-hexagon text-primary mr-2" aria-hidden="true"></i>
+                        十六进制 (Base 16)
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="hexadecimal" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary shadow-input outline-none transition-all-300"
+                            placeholder="输入十六进制数字 (0-9, A-F)"
+                            data-base="16"
+                        >
+                        <button class="copy-btn absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary transition-all-300" data-target="hexadecimal">
+                            <i class="fa fa-copy" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 转换历史记录 -->
+            <div class="bg-white rounded-lg shadow-custom p-6 mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold flex items-center">
+                        <i class="fa fa-history text-primary mr-2" aria-hidden="true"></i>
+                        转换历史
+                    </h2>
+                    <button id="clear-history" class="text-sm text-gray-500 hover:text-red-500 transition-all-300 flex items-center">
+                        <i class="fa fa-trash-o mr-1" aria-hidden="true"></i>
+                        清除历史
+                    </button>
+                </div>
+                <div id="history-list" class="space-y-3 max-h-48 overflow-y-auto pr-2 text-sm">
+                    <div class="text-gray-500 italic text-center py-6">暂无转换记录</div>
+                </div>
+            </div>
+
+            <!-- 进制知识卡片 -->
+            <div class="bg-white rounded-lg shadow-custom p-6">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fa fa-book text-primary mr-2" aria-hidden="true"></i>
+                    进制小知识
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-600">
+                    <div>
+                        <h3 class="font-medium text-primary mb-2">什么是进制？</h3>
+                        <p class="text-sm">进制也就是进位计数制，是人为定义的带进位的计数方法。对于任何一种进制，比如X进制，就表示每一位上的数运算时都是逢X进一位。</p>
+                    </div>
+                    <div>
+                        <h3 class="font-medium text-primary mb-2">常见进制的应用</h3>
+                        <ul class="list-disc list-inside text-sm space-y-1">
+                            <li>二进制：计算机底层运算</li>
+                            <li>八进制：早期计算机系统中使用</li>
+                            <li>十进制：日常计数和计算</li>
+                            <li>十六进制：编程和数字表示（如颜色值）</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <i class="fa fa-exchange" aria-hidden="true"></i>
+                        <span class="font-bold">进制转换器</span>
+                    </div>
+                    <p class="text-gray-400 text-sm">一个简单实用的在线进制转换工具</p>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="#" class="text-gray-400 hover:text-white transition-all-300">
+                        <i class="fa fa-github text-xl" aria-hidden="true"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-all-300">
+                        <i class="fa fa-twitter text-xl" aria-hidden="true"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-all-300">
+                        <i class="fa fa-envelope text-xl" aria-hidden="true"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-6 pt-6 text-center text-gray-400 text-sm">
+                &copy; 2023 进制转换器 | 设计与开发
+            </div>
+        </div>
+    </footer>
+
+    <!-- 通知提示 -->
+    <div id="notification" class="fixed bottom-4 right-4 bg-dark text-white px-4 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all-300 flex items-center">
+        <i class="fa fa-check-circle mr-2" aria-hidden="true"></i>
+        <span id="notification-text">复制成功</span>
+    </div>
+
+    <script>
+        // 存储是否正在更新输入框的状态，防止循环更新
+        let isUpdating = false;
+        
+        // 计时器ID，用于延迟记录历史
+        let historyTimer = null;
+        
+        // 所有输入框元素
+        const inputs = document.querySelectorAll('input[data-base]');
+        
+        // 为每个输入框添加输入事件监听
+        inputs.forEach(input => {
+            input.addEventListener('input', function() {
+                // 如果正在更新，则忽略
+                if (isUpdating) return;
+                
+                // 获取当前输入的基数和值
+                const base = parseInt(this.getAttribute('data-base'));
+                const value = this.value.trim();
+                
+                // 清除之前的计时器
+                if (historyTimer) {
+                    clearTimeout(historyTimer);
+                    historyTimer = null;
+                }
+                
+                // 如果值为空，清空所有输入框
+                if (value === '') {
+                    clearAllInputs();
+                    return;
+                }
+                
+                // 验证输入值是否符合当前基数的规则
+                if (!validateInput(value, base)) {
+                    return;
+                }
+                
+                // 转换并更新其他输入框
+                updateOtherInputs(value, base);
+                
+                // 设置新的计时器，2秒后记录历史
+                historyTimer = setTimeout(() => {
+                    addToHistory(value, base);
+                    historyTimer = null;
+                }, 2000);
+            });
+        });
+        
+        // 复制按钮功能
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const targetInput = document.getElementById(targetId);
+                
+                // 复制到剪贴板
+                targetInput.select();
+                document.execCommand('copy');
+                
+                // 显示通知
+                showNotification(`已复制${getBaseName(targetId)}值`);
+            });
+        });
+        
+        // 清除历史记录
+        document.getElementById('clear-history').addEventListener('click', function() {
+            localStorage.removeItem('conversionHistory');
+            updateHistoryDisplay();
+        });
+        
+        // 验证输入是否符合基数规则
+        function validateInput(value, base) {
+            let regex;
+            
+            switch (base) {
+                case 2:
+                    // 二进制：0-1，可选小数点
+                    regex = /^[01]+(\.[01]+)?$/;
+                    break;
+                case 8:
+                    // 八进制：0-7，可选小数点
+                    regex = /^[0-7]+(\.[0-7]+)?$/;
+                    break;
+                case 10:
+                    // 十进制：0-9，可选小数点
+                    regex = /^[0-9]+(\.[0-9]+)?$/;
+                    break;
+                case 16:
+                    // 十六进制：0-9, a-f, A-F，可选小数点
+                    regex = /^[0-9a-fA-F]+(\.[0-9a-fA-F]+)?$/;
+                    break;
+                default:
+                    return false;
+            }
+            
+            // 空值视为有效（会触发清空）
+            if (value === '') return true;
+            
+            return regex.test(value);
+        }
+        
+        // 清空所有输入框
+        function clearAllInputs() {
+            isUpdating = true;
+            inputs.forEach(input => {
+                input.value = '';
+            });
+            isUpdating = false;
+        }
+        
+        // 更新其他输入框的值
+        function updateOtherInputs(value, sourceBase) {
+            isUpdating = true;
+            
+            // 转换为十进制，作为中间值
+            const decimalValue = convertToDecimal(value, sourceBase);
+            
+            // 更新其他基数的输入框
+            inputs.forEach(input => {
+                const targetBase = parseInt(input.getAttribute('data-base'));
+                
+                // 跳过源输入框
+                if (targetBase === sourceBase) return;
+                
+                // 转换并设置值
+                input.value = convertFromDecimal(decimalValue, targetBase);
+            });
+            
+            isUpdating = false;
+        }
+        
+        // 转换为十进制
+        function convertToDecimal(value, base) {
+            // 处理小数
+            if (value.includes('.')) {
+                const parts = value.split('.');
+                const integerPart = parts[0];
+                const fractionalPart = parts[1];
+                
+                // 整数部分转换
+                let intValue = 0;
+                for (let i = 0; i < integerPart.length; i++) {
+                    const digit = parseInt(integerPart[i], base);
+                    intValue = intValue * base + digit;
+                }
+                
+                // 小数部分转换
+                let fracValue = 0;
+                for (let i = 0; i < fractionalPart.length; i++) {
+                    const digit = parseInt(fractionalPart[i], base);
+                    fracValue += digit / Math.pow(base, i + 1);
+                }
+                
+                return intValue + fracValue;
+            } else {
+                // 整数转换
+                return parseInt(value, base);
+            }
+        }
+        
+        // 从十进制转换到目标基数
+        function convertFromDecimal(decimalValue, targetBase, precision = 10) {
+            // 处理0的情况
+            if (decimalValue === 0) return '0';
+            
+            let result = '';
+            const isNegative = decimalValue < 0;
+            
+            // 取绝对值处理
+            let value = Math.abs(decimalValue);
+            
+            // 处理整数部分
+            const integerPart = Math.floor(value);
+            let intResult = '';
+            
+            if (integerPart > 0) {
+                let num = integerPart;
+                while (num > 0) {
+                    const remainder = num % targetBase;
+                    // 十六进制转换为字母
+                    intResult = (remainder < 10 ? remainder : String.fromCharCode(55 + remainder)) + intResult;
+                    num = Math.floor(num / targetBase);
+                }
+            } else {
+                intResult = '0';
+            }
+            
+            result += intResult;
+            
+            // 处理小数部分
+            const fractionalPart = value - integerPart;
+            if (fractionalPart > 0) {
+                let fracResult = '';
+                let fracValue = fractionalPart;
+                let count = 0;
+                
+                while (fracValue > 0 && count < precision) {
+                    fracValue *= targetBase;
+                    const digit = Math.floor(fracValue);
+                    fracResult += (digit < 10 ? digit : String.fromCharCode(55 + digit));
+                    fracValue -= digit;
+                    count++;
+                }
+                
+                result += '.' + fracResult;
+            }
+            
+            // 处理负数
+            return isNegative ? '-' + result : result;
+        }
+        
+        // 添加到历史记录
+        function addToHistory(value, base) {
+            // 获取历史记录
+            let history = JSON.parse(localStorage.getItem('conversionHistory') || '[]');
+            
+            // 创建记录对象
+            const record = {
+                timestamp: new Date().toISOString(),
+                input: value,
+                base: base,
+                results: {}
+            };
+            
+            // 获取各进制结果
+            inputs.forEach(input => {
+                const targetBase = parseInt(input.getAttribute('data-base'));
+                record.results[targetBase] = input.value;
+            });
+            
+            // 添加到历史记录（最多保存20条）
+            history.unshift(record);
+            if (history.length > 20) {
+                history = history.slice(0, 20);
+            }
+            
+            // 保存到本地存储
+            localStorage.setItem('conversionHistory', JSON.stringify(history));
+            
+            // 更新历史记录显示
+            updateHistoryDisplay();
+        }
+        
+        // 更新历史记录显示
+        function updateHistoryDisplay() {
+            const historyList = document.getElementById('history-list');
+            const history = JSON.parse(localStorage.getItem('conversionHistory') || '[]');
+            
+            // 清空列表
+            historyList.innerHTML = '';
+            
+            // 如果没有历史记录
+            if (history.length === 0) {
+                historyList.innerHTML = '<div class="text-gray-500 italic text-center py-6">暂无转换记录</div>';
+                return;
+            }
+            
+            // 添加历史记录项
+            history.forEach(record => {
+                const date = new Date(record.timestamp);
+                const formattedDate = date.toLocaleString();
+                
+                const item = document.createElement('div');
+                item.className = 'p-3 bg-gray-50 rounded border border-gray-100 hover:bg-gray-100 transition-all-300';
+                
+                // 获取基数名称
+                const baseName = getBaseNameByNumber(record.base);
+                
+                item.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="font-medium">${baseName}: ${record.input}</div>
+                        <div class="text-xs text-gray-500">${formattedDate}</div>
+                    </div>
+       <!-- 二进制单独一行 -->
+<div class="text-xs text-gray-600 mb-1">
+  ${getBaseNameByNumber(2)}: ${record.results[2] || '-'}
+</div>
+
+<!-- 其他进制在同一行 -->
+<div class="grid grid-cols-3 md:grid-cols-3 gap-2 text-xs text-gray-600">
+  <div>${getBaseNameByNumber(8)}: ${record.results[8] || '-'}</div>
+  <div>${getBaseNameByNumber(10)}: ${record.results[10] || '-'}</div>
+  <div>${getBaseNameByNumber(16)}: ${record.results[16] || '-'}</div>
+</div>
+                `;
+                
+                historyList.appendChild(item);
+            });
+        }
+        
+        // 根据ID获取基数名称
+        function getBaseName(id) {
+            const baseNames = {
+                'binary': '二进制',
+                'octal': '八进制',
+                'decimal': '十进制',
+                'hexadecimal': '十六进制'
+            };
+            return baseNames[id] || '';
+        }
+        
+        // 根据数字获取基数名称
+        function getBaseNameByNumber(number) {
+            const baseNames = {
+                2: '二进制',
+                8: '八进制',
+                10: '十进制',
+                16: '十六进制'
+            };
+            return baseNames[number] || '';
+        }
+        
+        // 显示通知
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notification-text');
+            
+            notificationText.textContent = message;
+            
+            // 显示通知
+            notification.classList.remove('translate-y-20', 'opacity-0');
+            notification.classList.add('translate-y-0', 'opacity-100');
+            
+            // 3秒后隐藏
+            setTimeout(() => {
+                notification.classList.remove('translate-y-0', 'opacity-100');
+                notification.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+        
+        // 页面加载时初始化历史记录显示
+        window.addEventListener('load', updateHistoryDisplay);
+    </script>
+</body>
+</html>
+    
